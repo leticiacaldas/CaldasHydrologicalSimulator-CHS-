@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  hydrosim-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hydrosim-rf-dev
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - /app/venv  # Não sincronizar venv local
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=false
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_CLIENT_SHOW_ERROR_DETAILS=true
+      - PYTHONUNBUFFERED=1
+      - ENABLE_LISFLOOD=false
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - hydrosim-network
+
+networks:
+  hydrosim-network:
+    driver: bridge

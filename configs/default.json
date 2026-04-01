@@ -1,0 +1,73 @@
+{
+  "simulation": {
+    "random_seed": 42,
+    "rainfall_mm_per_step": 5.0,
+    "num_time_steps": 100,
+    "time_step_minutes": 10,
+    "total_rainfall_mm": null,
+    "description": "Standard rainfall event (174 mm over 24 hours in 100 steps of 10 min)"
+  },
+  
+  "hydraulics": {
+    "diffusion_coefficient": 0.5,
+    "flood_threshold_m": 0.1,
+    "rainfall_mode": "uniform",
+    "description": "diffusion_coefficient: 0 < α ≤ 1; controls water transfer between cells"
+  },
+  
+  "grid": {
+    "resampling_factor": 4,
+    "cell_size_meters": null,
+    "description": "Resampling factor applied to DEM prior to simulation (1=native, 4=4x coarser)"
+  },
+  
+  "visualization": {
+    "animation_format": "gif",
+    "animation_duration_sec": 10,
+    "water_transparency": 0.4,
+    "visualization_threshold_m": 0.005,
+    "gamma_stretch": 0.9,
+    "basemap": "CartoDB.Positron",
+    "show_dem_hillshade": false,
+    "show_rainfall_particles": false,
+    "show_water_contour": false
+  },
+  
+  "machine_learning": {
+    "enabled": true,
+    "n_estimators": 100,
+    "max_tree_depth": 12,
+    "test_split_ratio": 0.2,
+    "probability_threshold": 0.5,
+    "description": "Random Forest hyperparameters for flood inundation classification"
+  },
+  
+  "mitigation_analysis": {
+    "enabled": true,
+    "probability_threshold": 0.45,
+    "slope_threshold": 0.05,
+    "description": "Parameters for spatial flood mitigation intervention analysis"
+  },
+  
+  "export": {
+    "save_probability_geotiff": true,
+    "save_probability_rgba": true,
+    "save_png_overlay": true,
+    "save_animation": true,
+    "save_metrics_csv": true,
+    "save_config_json": true
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "log_file": "hydrosim_simulation.log",
+    "log_to_console": true
+  },
+  
+  "metadata": {
+    "version": "1.0.0",
+    "created_date": "2026-03-23",
+    "author": "Letícia Caldas",
+    "publication_ready": true
+  }
+}

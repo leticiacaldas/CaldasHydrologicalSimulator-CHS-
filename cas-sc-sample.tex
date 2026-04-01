@@ -1,0 +1,212 @@
+%%
+%% Copyright 2019-2024 Elsevier Ltd
+%%
+%% This file is part of the 'CAS Bundle'.
+%% --------------------------------------
+%%
+%% It may be distributed under the conditions of the LaTeX Project Public
+%% License, either version 1.3c of this license or (at your option) any
+%% later version.  The latest version of this license is in
+%%    http://www.latex-project.org/lppl.txt
+%% and version 1.3c or later is part of all distributions of LaTeX
+%% version 1999/12/01 or later.
+%%
+%% The list of all files belonging to the 'CAS Bundle' is
+%% given in the file `manifest.txt'.
+%%
+%% Template article for cas-sc documentclass for
+%% double column output.
+
+\documentclass[a4paper,fleqn]{cas-sc}
+
+% If the frontmatter runs over more than one page
+% use the longmktitle option.
+
+%\documentclass[a4paper,fleqn,longmktitle]{cas-sc}
+
+%\usepackage[numbers]{natbib}
+%\usepackage[authoryear]{natbib}
+\usepackage[authoryear,longnamesfirst]{natbib}
+
+%%%Author macros
+\def\tsc#1{\csdef{#1}{\textsc{\lowercase{#1}}\xspace}}
+\tsc{WGM}
+\tsc{QE}
+%%%
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+% Short title
+\shorttitle{HydroSim-RF}
+
+% Short author
+\shortauthors{Caldas et~al.}
+
+% Main title of the paper
+\title [mode = title]{HydroSim-RF: A GIS-Based Flood Simulation and Machine Learning Approach for Predicting Flood-Prone Areas}
+
+% Title footnote mark
+% eg: \tnotemark[1]
+%\tnotemark[1]
+
+% Title footnote 1.
+% eg: \tnotetext[1]{Title footnote text}
+%\tnotetext[1]{}
+
+\author[1,2]{Letícia Caldas}[orcid=0000-0002-2292-7849]
+\cormark[1]
+\ead{lbcaldas@inf.ufpel.edu.br}
+
+\author[2]{Stefan Nachtigall}
+\ead{stefan.nachtigall@colaborador.embrapa.br}
+
+\author[1,2]{Breno Pereira}
+\ead{breno.pereira@colaborador.embrapa.br}
+
+\author[1,2]{Denner Mulling}
+\ead{denner.mulling@colaborador.embrapa.br}
+
+\author[2]{Adalbeto Miura}
+\ead{adalberto.miura@embrapa.br}
+
+\cortext[1]{Corresponding author}
+
+\affiliation[1]{organization={Universidade Federal de Pelotas - UFPel},
+            addressline={Rua Gomes Carneiro, 1},
+            city={Pelotas},
+            state={RS},
+            postcode={96010-610},
+            country={Brazil}}
+
+\affiliation[2]{organization={Embrapa Clima Temperado},
+            addressline={BR-392, Km 78, Monte Bonito},
+            city={Pelotas},
+            state={RS},
+            postcode={96010-971},
+            country={Brazil}}
+
+% Here goes the abstract
+\begin{abstract}
+Extreme precipitation events have intensified flood occurrences, increasing the demand for computational tools that support rapid analysis and decision-making with GIS-ready products. While fully hydrodynamic models provide high physical accuracy, they often require extensive data, calibration effort, and computational resources, limiting their applicability in exploratory and time-sensitive scenarios.
+
+This paper presents HydroSim-RF (v1.0.0), an open-source GIS-oriented hybrid software for rapid 2-D flood inundation simulation and flood susceptibility screening from Digital Elevation Models (DEMs). The system operates on a raster grid and simulates surface-water dynamics using a vectorized diffusion-wave (zero-inertia) storage-cell scheme with local neighbourhood exchanges, in which water is redistributed between neighbouring cells according to local free-surface head gradients and an interpretable diffusion-rate parameter, while conserving water volume within the active domain.
+
+Rainfall forcing is specified as user-defined cumulative rainfall applied over discrete time steps, either uniformly across the domain or concentrated on vector-derived source masks (and optionally channel corridors) to support rapid scenario construction. In addition to process-based simulation, HydroSim-RF incorporates a Random Forest classifier that generates an inundation likelihood (susceptibility) proxy from DEM-derived predictors (normalized elevation and slope), trained using simulation-derived flood labels.
+
+The software provides interactive execution and visualization and exports GIS-compatible outputs, including water-depth and likelihood rasters (GeoTIFF), flood-extent vectors (GeoPackage), animated inundation evolution (GIF), and time-series diagnostics. HydroSim-RF is intended for rapid flood assessment, scenario comparison, and preliminary risk screening, complementing (not replacing) fully hydrodynamic models in detailed engineering studies.
+\end{abstract}
+
+% Research highlights
+\begin{highlights}
+\item Raster-based diffusion-wave (zero-inertia) solver for rapid 2-D inundation dynamics on DEM grids.
+\item Random Forest susceptibility proxy from DEM-derived predictors (normalized elevation and slope).
+\item GIS-ready outputs including GeoTIFF rasters, GeoPackage vectors, animated GIFs, and time-series diagnostics.
+\end{highlights}
+
+% Keywords
+% Each keyword is seperated by \sep
+\begin{keywords}
+Flood inundation \sep Diffusion-wave \sep Digital Elevation Model (DEM) \sep GIS \sep Random Forest \sep Susceptibility mapping \sep Open-source software
+\end{keywords}
+
+\maketitle
+
+% Main text
+\section{Introduction}\label{sec:introduction}
+Anthropogenic climate change has intensified the frequency and magnitude of extreme precipitation events in several regions, with impacts that extend beyond environmental effects and directly affect socioeconomic and territorial organization (Tabari, 2021; V\"or\"osmarty et al., 2013). Increases in extreme daily precipitation and the number of rainy days have been associated with adverse effects on economic growth, including sectors traditionally considered less sensitive to climate variability (Kotz et al., 2022). These extreme events contribute to a higher occurrence of floods, placing pressure on urban infrastructure and increasing the vulnerability of occupied areas, thereby reinforcing the need for computational tools capable of supporting rapid analysis and territorial planning.
+
+In Brazil, this scenario has translated into hydrological events with increasing impacts on both urban and rural areas, particularly where land use and drainage infrastructure have not kept pace with the intensification of climate extremes (Neto et al., 2025). The floods recorded in Rio Grande do Sul in 2024 illustrate this vulnerability: extensive urban areas were submerged, transportation systems and essential services were disrupted, and significant material and social losses were observed. Such events intensify the demand for tools that enable rapid understanding of surface-runoff dynamics and early identification of flood-prone areas.
+
+Despite advances in flood modelling, approaches based on Geographic Information Systems (GIS) and spatial databases still face limitations when representing inherently dynamic and time-dependent processes, such as surface runoff during intense rainfall. GIS-based methods are effective for spatial analysis and cartographic production; however, they often represent flooding in a static or implicit manner, limiting their ability to capture the temporal evolution of hydrological processes. In contrast, physically based hydrological and hydrodynamic models can represent flow dynamics and flood propagation in detail, but typically require large volumes of input data, calibration procedures, and high computational cost, which restricts their applicability in exploratory analyses and rapid decision-making contexts (Teng et al., 2017; Hunter et al., 2008; Chiang et al., 2024).
+
+Recent studies have explored the integration of artificial intelligence techniques with hydrological modelling to improve predictive performance and computational efficiency (Chen et al., 2023; He et al., 2023). Machine learning approaches, such as Random Forest models, have demonstrated potential for flood susceptibility mapping and spatial prediction based on environmental predictors (Kang et al., 2024; Costache et al., 2025; Zhao et al., 2024). However, many ML-only approaches do not provide time-evolving inundation trajectories, while many simulation tools do not integrate ML-based screening products and GIS-first export pipelines in a unified workflow.
+
+The applicability of flood modelling approaches across different spatial scales is also influenced by the resolution and quality of Digital Elevation Models (DEMs). At regional scales, remote-sensing products such as the Shuttle Radar Topography Mission (SRTM) (Farr et al., 2007) and ANADEM (Laipelt et al., 2024) can support exploratory analyses by revealing general flow patterns and flood-prone areas. At local scales, higher-resolution datasets (e.g., photogrammetry- and LiDAR-derived DEMs) allow a more detailed representation of terrain features that directly influence surface-runoff dynamics.
+
+In this context, this paper introduces HydroSim-RF (v1.0.0), an open-source GIS-oriented hybrid software for rapid 2-D flood inundation simulation and flood susceptibility screening from DEMs. The physical core is a raster-based diffusion-wave (zero-inertia) storage-cell scheme that redistributes water across a grid according to local free-surface head gradients, controlled by an interpretable diffusion-rate parameter and an inundation threshold, enabling efficient simulation of spatiotemporal flood propagation.
+
+Rainfall forcing in HydroSim-RF is specified as user-defined cumulative rainfall applied over discrete time steps, either uniformly across the domain or concentrated on vector-derived source masks (and optionally channel corridors), supporting rapid scenario construction under limited data availability. To enhance screening capabilities, the framework incorporates a machine learning module based on a Random Forest classifier that produces an inundation likelihood (susceptibility) proxy from DEM-derived predictors (normalized elevation and slope), trained using simulation-derived flood labels.
+
+The proposed tool generates geospatial outputs compatible with GIS environments, including water-depth and likelihood rasters (GeoTIFF), flood-extent vectors (GeoPackage), animated inundation evolution (GIF), and time-series diagnostics. Overall, HydroSim-RF aims to support rapid scenario analysis, preliminary risk assessment, and territorial planning, complementing (not replacing) fully hydrodynamic models in detailed engineering studies.
+
+\section{Methodology}\label{sec:methodology}
+This section describes the numerical core and the susceptibility module implemented in HydroSim-RF. The description follows the software implementation (NumPy-based diffusion-wave storage-cell solver and scikit-learn Random Forest) and aims to support reproducibility while clarifying the assumptions and controllable parameters.
+
+\subsection{Inputs and preprocessing}\label{subsec:methodology_inputs}
+HydroSim-RF operates on a regular raster grid defined by a Digital Elevation Model (DEM) $z$ (meters above sea level). Optionally, vector layers may be provided to delineate rainfall \emph{source areas} (e.g., catchment polygons or inflow zones) and/or \emph{channel corridors}; these are rasterised to binary masks on the simulation grid.
+
+No-data or invalid DEM cells are handled to avoid spurious sinks: missing values are replaced by a robust central value (domain median) for numerical stability, while a validity mask is retained so that forcing and exports can be restricted to cells that are valid in the original DEM.
+
+Model parameters include (i) a diffusion-rate coefficient $\alpha$ ($0 < \alpha \le 1$) that limits how much water can leave a cell per step, (ii) an inundation threshold $h_f$ (meters) used to classify flooded cells for reporting, (iii) the planimetric cell size $\Delta x$ (meters), which defines the cell area $A = (\Delta x)^2$, and (iv) a user-defined time-step duration $\Delta t$ (minutes) used for diagnostic time stamps.
+
+\subsection{Raster-based diffusion-wave storage-cell scheme}\label{subsec:methodology_model}
+The state variable is the water depth grid $h$ (meters). At each step, HydroSim-RF computes the free-surface head (water surface elevation)
+\begin{equation}
+\eta_{i,j} = z_{i,j} + h_{i,j},
+\end{equation}
+and redistributes water from each active cell to lower-head neighbours following a diffusion-wave (zero-inertia) storage-cell approximation. Neighbourhood interactions use an 8-connected (Moore) stencil, with diagonal distances accounted for via $d \in \{1, \sqrt{2}\}$.
+
+For a donor cell $(i,j)$, let $\mathcal{N}(i,j)$ be its neighbours and define the candidate receiver set
+\begin{equation}
+\mathcal{R}(i,j) = \{(m,n) \in \mathcal{N}(i,j)\, : \, \eta_{m,n} < \eta_{i,j}\}.
+\end{equation}
+If $\mathcal{R}(i,j)$ is empty, the cell is deactivated (for computational efficiency). Otherwise, the algorithm computes slope-like weights
+\begin{equation}
+w_{m,n} = \max\left(\frac{\eta_{i,j} - \eta_{m,n}}{d_{m,n}}, 0\right),
+\end{equation}
+and (to reduce unrealistic lateral spreading) retains at most the two receivers with the largest weights.
+
+The maximum amount of water that can leave the donor in one step is
+\begin{equation}
+M_{i,j} = \alpha\, h_{i,j}.
+\end{equation}
+This amount is partitioned among receivers proportionally to $w_{m,n}$ and capped to prevent overshoot relative to the local head difference. For each receiver $(m,n) \in \mathcal{R}(i,j)$ the transferred depth is
+\begin{equation}
+\Delta h_{i,j \to m,n} = \min\left( M_{i,j}\,\frac{w_{m,n}}{\sum w},\; \frac{\eta_{i,j}-\eta_{m,n}}{2} \right),
+\end{equation}
+and donor/receiver depths are updated by subtracting/adding $\Delta h$. This symmetric update conserves water volume in the active domain to machine precision (modulo floating-point roundoff).
+
+To accelerate computation in large rasters, HydroSim-RF maintains a set of active cells. In the uniform-rainfall mode (Section~\ref{subsec:methodology_rainfall}), the active set is limited to a fraction of the domain with the highest water depths, and the set is periodically cleaned to remove cells with negligible water depth.
+
+\subsection{Rainfall forcing and scenario definition}\label{subsec:methodology_rainfall}
+Rainfall is applied as a user-defined depth per step (millimeters), converted internally to meters. Total cumulative rainfall for a scenario is therefore the product of the per-step depth and the number of steps.
+
+HydroSim-RF supports two forcing modes:
+\begin{itemize}
+    \item \textbf{Uniform forcing}: rainfall is added to all valid DEM cells, enabling quick exploratory simulations when spatial rainfall detail is unavailable.
+    \item \textbf{Mask-based forcing}: rainfall is added only to rasterised source areas. If a source mask is not available but a channel-corridor mask is provided, the forcing can be directed preferentially to the corridor (scaled fractionally relative to the uniform case) as a pragmatic fallback.
+\end{itemize}
+
+The forcing choice (uniform vs. mask-based) is used to construct scenarios rapidly from minimal inputs and to compare alternative configurations under consistent numerical settings.
+
+\subsection{Diagnostics and inundation reporting}\label{subsec:methodology_diagnostics}
+At each time step, HydroSim-RF updates the elapsed simulation time by $\Delta t$ and records domain-wide diagnostics, including: inundated fraction (percentage of cells with $h > h_f$), number of active cells, maximum simulated depth, and total water volume
+\begin{equation}
+V = \sum_{i,j} h_{i,j}\,A.
+\end{equation}
+The framework also tracks an ``overflow time'' defined as the first time at which inundation ($h > h_f$) occurs outside the source mask.
+
+\subsection{Random Forest susceptibility proxy}\label{subsec:methodology_ml}
+In addition to process-based inundation simulation, HydroSim-RF provides an ML-based susceptibility (likelihood) proxy derived from DEM predictors. The implementation computes a compact feature set per cell consisting of: (i) normalized elevation and (ii) normalized slope magnitude. Both predictors are robustly scaled to $[0,1]$ using percentile-based normalization (2nd--98th percentiles) to reduce sensitivity to outliers; slope is estimated from DEM gradients.
+
+Binary training labels are generated from the simulation result by thresholding the simulated water depth (flooded if $h > h_f$). A Random Forest classifier is trained with class balancing to mitigate label imbalance. The trained model outputs a per-cell probability score in $[0,1]$ that is interpreted as a susceptibility proxy conditioned on the simulated labels and predictors (i.e., a screening layer rather than a calibrated probability of observed flooding).
+
+\subsection{Outputs and GIS-compatible export}\label{subsec:methodology_outputs}
+HydroSim-RF is designed to generate GIS-ready products for inspection, comparison, and reporting. Outputs include: water-depth rasters (GeoTIFF; both raw float and visual RGBA products), susceptibility rasters (GeoTIFF), flood-extent vector layers (GeoPackage), animated inundation evolution (GIF), and time-series diagnostics (e.g., JSON summaries and per-step history). Where available, georeferencing (transform and CRS) is inherited from the input GeoTIFF; otherwise, a consistent fallback georeference is used to allow end-to-end workflow execution.
+
+% NOTE: The parenthetical citations above are placeholders.
+% Replace them with \cite/\citet commands according to your BibTeX keys.
+
+\printcredits
+
+%% Loading bibliography style file
+\bibliographystyle{cas-model2-names}
+
+% Loading bibliography database
+% Update the filename below to match your .bib file
+\bibliography{cas-refs}
+
+\end{document}

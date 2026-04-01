@@ -1,0 +1,23 @@
+{
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Linux",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.11",
+      "pythonPath": "/home/leticia/Desktop/hydrosim/venv/bin/python",
+      "extraPaths": [
+        "/home/leticia/Desktop/hydrosim/venv/lib/python3.11/site-packages"
+      ]
+    }
+  ],
+  "typeCheckingMode": "basic",
+  "include": [
+    "**"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "venv"
+  ]
+}

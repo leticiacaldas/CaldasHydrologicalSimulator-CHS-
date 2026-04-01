@@ -1,0 +1,444 @@
+%% 
+%% Copyright 2019-2024 Elsevier Ltd
+%% 
+%% Version 2.4
+%% 
+%% This file is part of the 'CAS Bundle'.
+%% --------------------------------------
+%% 
+%% It may be distributed under the conditions of the LaTeX Project Public
+%% License, either version 1.2 of this license or (at your option) any
+%% later version.  The latest version of this license is in
+%%    http://www.latex-project.org/lppl.txt
+%% and version 1.2 or later is part of all distributions of LaTeX
+%% version 1999/12/01 or later.
+%% 
+%% The list of all files belonging to the 'CAS Bundle' is
+%% given in the file `manifest.txt'.
+%% 
+%% Template article for cas-dc documentclass for 
+%% double column output.
+
+%\documentclass[a4paper,fleqn,longmktitle]{cas-dc}
+\documentclass[a4paper,fleqn]{cas-dc}
+
+%\usepackage[authoryear,longnamesfirst]{natbib}
+%\usepackage[authoryear]{natbib}
+\usepackage[numbers]{natbib}
+
+%%%Author definitions
+\def\tsc#1{\csdef{#1}{\textsc{\lowercase{#1}}\xspace}}
+\tsc{WGM}
+\tsc{QE}
+\tsc{EP}
+\tsc{PMS}
+\tsc{BEC}
+\tsc{DE}
+%%%
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+\shorttitle{HydroSim-RF}
+\shortauthors{Caldas et~al.}
+
+\title [mode = title]{HydroSim-RF: an open-source hybrid framework for rapid 2-D flood inundation simulation and topography-driven susceptibility screening}                      
+%\tnotemark[1,2]
+%
+%\tnotetext[1]{Funding information (to be completed).}
+%\tnotetext[2]{Additional notes (to be completed).}
+
+
+\author[1,3]{J.K. Krishnan}[type=editor,
+                        auid=000,bioid=1,
+                        prefix=Sir,
+                        role=Researcher,
+                        orcid=0000-0001-0000-0000]
+\cormark[1]
+\fnmark[1]
+\ead{jkk@example.in}
+\ead[url]{www.jkkrishnan.in}
+
+\credit{Conceptualization of this study, Methodology, Software}
+
+%\address[1]{, Street 129, 1043 NX Amsterdam, The Netherlands}
+\affiliation[1]{organization={Department of Physics, J.K. Institute of Science},
+                addressline={Jawahar Nagar}, 
+                city={Trivandrum},
+%               citysep={}, % Uncomment if no comma needed between city and postcode
+                postcode={695013}, 
+                state={Kerala},
+                country={India}}
+
+\author[2,4]{Han Thane}[style=chinese]
+
+\author[2,3]{William {J. Hansen}}[%
+   role=Co-ordinator,
+   suffix=Jr,
+   ]
+\fnmark[2]
+\ead{wjh@example.org}
+\ead[URL]{https://www.university.org}
+
+\credit{Data curation, Writing - Original draft preparation}
+
+\affiliation[2]{organization={World Scientific University},
+                addressline={Street 29}, 
+                postcode={1011 NX}, 
+                postcodesep={}, 
+                city={Amsterdam},
+                country={The Netherlands}}
+
+\author[1,3]{T. Rafeeq}
+\cormark[2]
+\fnmark[1,3]
+\ead{t.rafeeq@example.in}
+\ead[URL]{www.campus.in}
+
+\affiliation[3]{organization={University of Intelligent Studies},
+                addressline={Street 15}, 
+                city={Jabaldesh},
+                postcode={825001}, 
+                state={Orissa}, 
+                country={India}}
+
+\cortext[cor1]{Corresponding author}
+\cortext[cor2]{Principal corresponding author}
+\fntext[fn1]{This is the first author footnote, but is common to third
+  author as well.}
+\fntext[fn2]{Another author footnote, this is a very long footnote and
+  it should be a really long footnote. But this footnote is not yet
+  sufficiently long enough to make two lines of footnote text.}
+
+\nonumnote{This note has no numbers. In this work we demonstrate $a_b$
+  the formation Y\_1 of a new type of polariton on the interface
+  between a cuprous oxide slab and a polystyrene micro-sphere placed
+  on the slab.
+  }
+
+\begin{abstract}
+The increasing impacts of extreme rainfall events demand flood-modelling tools that support rapid scenario screening and GIS-ready outputs under limited data and time constraints. This paper presents HydroSim-RF (v1.0.0), an open-source hybrid framework for rapid 2-D flood inundation simulation and topography-driven flood susceptibility mapping from Digital Elevation Models (DEMs).
+
+HydroSim-RF implements a raster-based diffusion-wave (zero-inertia) storage-cell scheme in which surface water is redistributed between neighbouring cells according to local free-surface head gradients, constrained by an interpretable diffusion-rate parameter and conserving water volume within the active domain. Rainfall forcing is represented as user-defined cumulative rainfall applied over discrete time steps, either uniformly across the domain or concentrated on vector-derived source masks (and optionally channel corridors).
+
+To complement process-based simulation, HydroSim-RF includes a Random Forest classifier that produces an inundation likelihood (susceptibility) proxy from DEM-derived predictors (normalized elevation and slope), trained using simulation-derived flood labels. The software provides interactive execution and visualization and exports GIS-compatible products, including water-depth and likelihood rasters (GeoTIFF), flood-extent vectors (GeoPackage), animated inundation evolution (GIF), and time-series diagnostics.
+
+HydroSim-RF is intended for rapid assessment, exploratory scenario comparison, and preliminary risk screening, complementing (not replacing) fully hydrodynamic models in detailed engineering studies.
+\end{abstract}
+
+\begin{graphicalabstract}
+\includegraphics{figs/cas-grabs.pdf}
+\end{graphicalabstract}
+
+\begin{highlights}
+\item Raster-based diffusion-wave (zero-inertia) solver for rapid 2-D inundation dynamics on DEM grids.
+\item Random Forest susceptibility proxy from DEM-derived predictors (normalized elevation and slope).
+\item GIS-ready outputs including GeoTIFF rasters, GeoPackage vectors, animated GIFs, and time-series diagnostics.
+\end{highlights}
+
+\begin{keywords}
+Flood inundation \sep Diffusion-wave \sep Digital Elevation Model (DEM) \sep GIS \sep Random Forest \sep Susceptibility mapping \sep Open-source software
+\end{keywords}
+
+
+\maketitle
+
+\section{Introduction}
+
+Climate change has intensified extreme precipitation in many regions, increasing flood impacts on infrastructure, services, and territorial organization (Tabari, 2021; V\"or\"osmarty et al., 2013). In Brazil, recent events have highlighted the vulnerability of urban systems where land-use change and drainage capacity have not kept pace with increasing extremes (Neto et al., 2025). These pressures strengthen the need for modelling tools that can be deployed quickly to support exploratory analyses, compare scenarios, and deliver spatially explicit outputs for planning workflows.
+
+A wide spectrum of flood modelling approaches exists. GIS-based methods are effective for terrain analysis and cartographic products but often represent flooding statically or implicitly, limiting the representation of time-evolving inundation dynamics. Conversely, physically based hydrodynamic models can capture flow processes in detail but frequently require extensive input data, calibration, and computational resources, constraining their use in rapid decision-making contexts (Teng et al., 2017; Hunter et al., 2008; Chiang et al., 2024). Practical planning applications therefore benefit from intermediate-complexity approaches that retain physically interpretable dynamics while remaining computationally efficient and easy to integrate into GIS environments.
+
+In parallel, machine learning has been increasingly used for flood susceptibility mapping and spatial prediction based on environmental predictors (Chen et al., 2023; He et al., 2023; Kang et al., 2024). However, many ML-only approaches do not provide time-evolving inundation trajectories, while many simulation tools do not integrate ML-based screening products and GIS-first export pipelines in a unified workflow.
+
+This paper introduces HydroSim-RF (v1.0.0), an open-source hybrid software designed for rapid, raster-based flood simulation and susceptibility screening from DEMs. The physical core is a diffusion-wave (zero-inertia) storage-cell scheme that redistributes water across a grid according to local free-surface head gradients, controlled by a diffusion-rate parameter and an inundation threshold. Rainfall forcing is specified as cumulative rainfall applied across discrete time steps, either uniformly over the domain or concentrated on vector-derived source masks (and optionally channel corridors), enabling rapid scenario construction.
+
+HydroSim-RF also includes a Random Forest module that generates an inundation likelihood (susceptibility) proxy from DEM-derived predictors (normalized elevation and slope), trained using simulation-derived flood labels. This coupling supports rapid screening and comparison while maintaining a clear link between simulated dynamics and susceptibility patterns. The software provides interactive visualization and produces GIS-compatible outputs, including GeoTIFF rasters (water depth and inundation likelihood), GeoPackage vectors (flood extent), animated GIFs of inundation evolution, and time-series diagnostics for reporting and scenario comparison.
+
+% NOTE: The parenthetical citations above are placeholders.
+% Replace them with \cite/\citet commands according to your BibTeX keys.
+
+\section{Installation}
+
+The package is available at author resources page at Elsevier
+(\url{http://www.elsevier.com/locate/latex}).
+The class may be moved or copied to a place, usually,\linebreak
+\verb+$TEXMF/tex/latex/elsevier/+, %$%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+or a folder which will be read                   
+by \LaTeX{} during document compilation.  The \TeX{} file
+database needs updation after moving/copying class file.  Usually,
+we use commands like \verb+mktexlsr+ or \verb+texhash+ depending
+upon the distribution and operating system.
+
+\section{Front matter}
+
+The author names and affiliations could be formatted in two ways:
+\begin{enumerate}[(1)]
+\item Group the authors per affiliation.
+\item Use footnotes to indicate the affiliations.
+\end{enumerate}
+See the front matter of this document for examples. 
+You are recommended to conform your choice to the journal you 
+are submitting to.
+
+\section{Bibliography styles}
+
+There are various bibliography styles available. You can select the
+style of your choice in the preamble of this document. These styles are
+Elsevier styles based on standard styles like Harvard and Vancouver.
+Please use Bib\TeX\ to generate your bibliography and include DOIs
+whenever available.
+
+Here are two sample references: 
+\cite{Fortunato2010}
+\cite{Fortunato2010,NewmanGirvan2004}
+\cite{Fortunato2010,Vehlowetal2013}
+
+\section{Floats}
+{Figures} may be included using the command,\linebreak 
+\verb+\includegraphics+ in
+combination with or without its several options to further control
+graphic. \verb+\includegraphics+ is provided by {graphic[s,x].sty}
+which is part of any standard \LaTeX{} distribution.
+{graphicx.sty} is loaded by default. \LaTeX{} accepts figures in
+the postscript format while pdf\LaTeX{} accepts {*.pdf},
+{*.mps} (metapost), {*.jpg} and {*.png} formats. 
+pdf\LaTeX{} does not accept graphic files in the postscript format. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.9\columnwidth]{figs/cas-munnar-2024.jpg}
+	\caption{The beauty of Munnar, Kerala. (See also Table \protect\ref{tbl1}).}
+	\label{FIG:1}
+\end{figure}
+
+
+The \verb+table+ environment is handy for marking up tabular
+material. If users want to use {multirow.sty},
+{array.sty}, etc., to fine control/enhance the tables, they
+are welcome to load any package of their choice and
+{cas-dc.cls} will work in combination with all loaded
+packages.
+
+\begin{table}[width=.9\linewidth,cols=4,pos=h]
+\caption{This is a test caption. This is a test caption. This is a test
+caption. This is a test caption. Use \{table*\} instead of \{table\} if you
+want a two column spanned table.}\label{tbl1}
+\begin{tabular*}{\tblwidth}{@{} LLLL@{} }
+\toprule
+Col 1 & Col 2 & Col 3 & Col4\\
+\midrule
+12345 & 12345 & 123 & 12345 \\
+12345 & 12345 & 123 & 12345 \\
+12345 & 12345 & 123 & 12345 \\
+12345 & 12345 & 123 & 12345 \\
+12345 & 12345 & 123 & 12345 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\section[Theorem and ...]{Theorem and theorem like environments}
+
+{cas-dc.cls} provides a few shortcuts to format theorems and
+theorem-like environments with ease. In all commands the options that
+are used with the \verb+\newtheorem+ command will work exactly in the same
+manner. {cas-dc.cls} provides three commands to format theorem or
+theorem-like environments: 
+
+\begin{verbatim}
+ \newtheorem{theorem}{Theorem}
+ \newtheorem{lemma}[theorem]{Lemma}
+ \newdefinition{rmk}{Remark}
+ \newproof{pf}{Proof}
+ \newproof{pot}{Proof of Theorem \ref{thm2}}
+\end{verbatim}
+
+
+The \verb+\newtheorem+ command formats a
+theorem in \LaTeX's default style with italicized font, bold font
+for theorem heading and theorem number at the right hand side of the
+theorem heading.  It also optionally accepts an argument which
+will be printed as an extra heading in parentheses. 
+
+\begin{verbatim}
+  \begin{theorem} 
+   For system (8), consensus can be achieved with 
+   $\|T_{\omega z}$ ...
+     \begin{eqnarray}\label{10}
+     ....
+     \end{eqnarray}
+  \end{theorem}
+\end{verbatim}  
+
+
+\newtheorem{theorem}{Theorem}
+
+\begin{theorem}
+For system (8), consensus can be achieved with 
+$\|T_{\omega z}$ ...
+\begin{eqnarray}\label{10}
+....
+\end{eqnarray}
+\end{theorem}
+
+The \verb+\newdefinition+ command is the same in
+all respects as its \verb+\newtheorem+ counterpart except that
+the font shape is roman instead of italic.  Both
+\verb+\newdefinition+ and \verb+\newtheorem+ commands
+automatically define counters for the environments defined.
+
+The \verb+\newproof+ command defines proof environments with
+upright font shape.  No counters are defined. 
+
+\begin{figure*}
+	\centering
+	\includegraphics[width=.9\textwidth]{figs/cas-munnar-2024.jpg}
+	\caption{The beauty of Munnar, Kerala. (See also Table \protect\ref{tbl1}).}
+	\label{FIG:2}
+\end{figure*}
+
+
+\section[Enumerated ...]{Enumerated and Itemized Lists}
+{cas-dc.cls} provides an extended list processing macros
+which makes the usage a bit more user friendly than the default
+\LaTeX{} list macros.   With an optional argument to the
+\verb+\begin{enumerate}+ command, you can change the list counter
+type and its attributes.
+
+\begin{verbatim}
+ \begin{enumerate}[1.]
+ \item The enumerate environment starts with an optional
+   argument `1.', so that the item counter will be suffixed
+   by a period.
+ \item You can use `a)' for alphabetical counter and '(i)' 
+  for roman counter.
+  \begin{enumerate}[a)]
+    \item Another level of list with alphabetical counter.
+    \item One more item before we start another.
+    \item One more item before we start another.
+    \item One more item before we start another.
+    \item One more item before we start another.
+\end{verbatim}
+
+Further, the enhanced list environment allows one to prefix a
+string like `step' to all the item numbers.  
+
+\begin{verbatim}
+ \begin{enumerate}[Step 1.]
+  \item This is the first step of the example list.
+  \item Obviously this is the second step.
+  \item The final step to wind up this example.
+ \end{enumerate}
+\end{verbatim}
+
+\section{Cross-references}
+In electronic publications, articles may be internally
+hyperlinked. Hyperlinks are generated from proper
+cross-references in the article.  For example, the words
+\textcolor{black!80}{Fig.~1} will never be more than simple text,
+whereas the proper cross-reference \verb+\ref{tiger}+ may be
+turned into a hyperlink to the figure itself:
+\textcolor{blue}{Fig.~1}.  In the same way,
+the words \textcolor{blue}{Ref.~[1]} will fail to turn into a
+hyperlink; the proper cross-reference is \verb+\cite{Knuth96}+.
+Cross-referencing is possible in \LaTeX{} for sections,
+subsections, formulae, figures, tables, and literature
+references.
+
+\section{Bibliography}
+
+Two bibliographic style files (\verb+*.bst+) are provided ---
+{model1-num-names.bst} and {model2-names.bst} --- the first one can be
+used for the numbered scheme. This can also be used for the numbered
+with new options of {natbib.sty}. The second one is for the author year
+scheme. When  you use model2-names.bst, the citation commands will be
+like \verb+\citep+,  \verb+\citet+, \verb+\citealt+ etc. However when
+you use model1-num-names.bst, you may use only \verb+\cite+ command.
+
+\verb+thebibliography+ environment.  Each reference is a\linebreak
+\verb+\bibitem+ and each \verb+\bibitem+ is identified by a label,
+by which it can be cited in the text:
+
+\noindent In connection with cross-referencing and
+possible future hyperlinking it is not a good idea to collect
+more that one literature item in one \verb+\bibitem+.  The
+so-called Harvard or author-year style of referencing is enabled
+by the \LaTeX{} package {natbib}. With this package the
+literature can be cited as follows:
+
+\begin{enumerate}[\textbullet]
+\item Parenthetical: \verb+\citep{WB96}+ produces (Wettig \& Brown, 1996).
+\item Textual: \verb+\citet{ESG96}+ produces Elson et al. (1996).
+\item An affix and part of a reference:\break
+\verb+\citep[e.g.][Ch. 2]{Gea97}+ produces (e.g. Governato et
+al., 1997, Ch. 2).
+\end{enumerate}
+
+In the numbered scheme of citation, \verb+\cite{<label>}+ is used,
+since \verb+\citep+ or \verb+\citet+ has no relevance in the numbered
+scheme.  {natbib} package is loaded by {cas-dc} with
+\verb+numbers+ as default option.  You can change this to author-year
+or harvard scheme by adding option \verb+authoryear+ in the class
+loading command.  If you want to use more options of the {natbib}
+package, you can do so with the \verb+\biboptions+ command.  For
+details of various options of the {natbib} package, please take a
+look at the {natbib} documentation, which is part of any standard
+\LaTeX{} installation.
+
+\appendix
+\section{My Appendix}
+Appendix sections are coded under \verb+\appendix+.
+
+\verb+\printcredits+ command is used after appendix sections to list 
+author credit taxonomy contribution roles tagged using \verb+\credit+ 
+in frontmatter.
+
+\printcredits
+
+%% Loading bibliography style file
+%\bibliographystyle{model1-num-names}
+\bibliographystyle{cas-model2-names}
+
+% Loading bibliography database
+\bibliography{cas-refs}
+
+
+%\vskip3pt
+
+\bio{}
+Author biography without author photo.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+\endbio
+
+\bio{figs/cas-pic1}
+Author biography with author photo.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+\endbio
+
+\bio{figs/cas-pic1}
+Author biography with author photo.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+Author biography. Author biography. Author biography.
+\endbio
+
+\end{document}
+
