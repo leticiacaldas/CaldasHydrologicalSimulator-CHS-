@@ -21,6 +21,7 @@ License: MIT
 
 import numpy as np
 from typing import Optional, Set, Tuple, Dict, Any, List
+from .gama_flood_model_d8 import GamaFloodModelNumpy as GamaFloodModelD8
 
 
 class DiffusionWaveFloodModel:
@@ -397,5 +398,8 @@ class NumpyDiffusionWaveEngine(DiffusionWaveFloodModel):
         self.record_diagnostics(time_step_minutes)
 
 
-# Alias de compatibilidade (legado)
-GamaFloodModelNumpy = NumpyDiffusionWaveEngine
+# Alias: usar a versão D8 melhorada como padrão
+GamaFloodModelNumpy = GamaFloodModelD8
+
+# Manter referência à versão legacy de difusão-onda para compatibilidade
+DiffusionWaveFloodModelLegacy = NumpyDiffusionWaveEngine

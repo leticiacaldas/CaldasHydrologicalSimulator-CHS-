@@ -1,186 +1,123 @@
-# Python / caches
+# ============================================================================
+# PYTHON & PACKAGES
+# ============================================================================
 __pycache__/
 *.py[cod]
 *.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .pyright/
-
-# Virtualenv
-venv/
-.venv/
-
-# OS / editor
-.DS_Store
-.idea/
-.vscode/
-
-# Logs / runtime
-*.log
-logs/
-
-# Outputs / generated artifacts
-outputs/
-data/
-
-# Large binary results (keep repo lean)
-*.npy
-*.npz
-*.tif
-*.tiff
-*.gif
-*.gpkg
-*.zip
-*.7z
-*.tar
-*.tar.gz
-
-# Images (keep only the UI logo by default)
-*.png
-*.jpg
-*.jpeg
-!logo.png# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Unit test / coverage reports
+.coverage
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
+# ============================================================================
+# VIRTUAL ENVIRONMENTS
+# ============================================================================
 venv/
+.venv/
+env/
 ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# IDEs
+# ============================================================================
+# IDE & EDITOR
+# ============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Project specific
-data/input/*
-data/output/*
-logs/*
+# ============================================================================
+# LOGS & TEMPORARY FILES
+# ============================================================================
+*.log
+logs/
+*.tmp
+.streamlit/
+.cache/
+.ipynb_checkpoints/
+
+# ============================================================================
+# DATA & LARGE FILES (EXCLUDE ALL)
+# ============================================================================
+data/
+inputs/
+input/
+outputs/
+output/
+*.npy
+*.npz
 *.tif
 *.tiff
+*.gif
+*.mp4
+*.gpkg
 *.shp
 *.shx
 *.dbf
 *.prj
-*.gpkg
-.streamlit/
-Simulacao\ estado/
+*.cpg
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.rar
+*.csv
+*.xlsx
+*.xls
+*.ipynb
+
+# ============================================================================
+# IMAGES (excluding essential docs)
+# ============================================================================
+*.png
+*.jpg
+*.jpeg
+*.bmp
+!docs/**/*.png
+!docs/**/*.jpg
+
+# ============================================================================
+# ENVIRONMENT & CONFIG
+# ============================================================================
+.env
+.env.local
+
+# ============================================================================
+# UNWANTED SCRIPTS & FILES
+# ============================================================================
+web_server.py
+web_server_v2.py
+web_server.log
+experiments/
+test_*.py
+example_*.py
+check_installation.py
+regen_visualizations.py
+visual_guide.py
+flood_validation_complete.py
+EXAMPLES_ML_VALIDATION.py
+generate_realistic_test_data.py
+shapes.py
+start.sh
+Makefile
+
+# ============================================================================
+# DOCUMENTATION (keep only main README)
+# ============================================================================
+*.md
+!README.md
+!docs/README.md

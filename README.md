@@ -1,8 +1,8 @@
-# HydroSim-RF: Hybrid Raster-Based Urban Flood Simulation Framework
+# CaldasHydrologicalSimulator (CHS): Hybrid Raster-Based Urban Flood Simulation Framework
 
 ## Descrição
 
-**HydroSim-RF** é uma aplicação web interativa para simulação rápida de inundações urbanas em 2D usando Modelos de Elevação Digital (DEMs). Implementa:
+**CaldasHydrologicalSimulator (CHS)** é uma aplicação web interativa para simulação rápida de inundações urbanas em 2D usando Modelos de Elevação Digital (DEMs). Implementa:
 
 - **Núcleo hidrodinâmico**: Aproximação de onda de difusão via solver NumPy vetorizado (`DiffusionWaveFloodModel`)
 - **Classificador de Machine Learning**: Random Forest para estimativa de probabilidade de inundação sem necessidade de dados de calibração

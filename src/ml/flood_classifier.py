@@ -44,6 +44,7 @@ def compute_topographic_features(dem: np.ndarray) -> np.ndarray:
     robustness to outliers.
     """
     dem = np.asarray(dem, dtype=float)
+    dem = np.nan_to_num(dem, nan=np.nanmedian(dem))
     dem_valid = dem[np.isfinite(dem)]
 
     # Normalize elevation
@@ -58,6 +59,7 @@ def compute_topographic_features(dem: np.ndarray) -> np.ndarray:
     # Compute slope via Sobel derivatives
     gy, gx = np.gradient(dem, edge_order=2)
     slope = np.sqrt(gx**2 + gy**2 + 1e-9)
+    slope = np.nan_to_num(slope, nan=0.0)
     slope_valid = slope[np.isfinite(slope)]
 
     if slope_valid.size > 0:
@@ -69,6 +71,11 @@ def compute_topographic_features(dem: np.ndarray) -> np.ndarray:
         slope_norm = np.zeros_like(slope)
 
     X = np.column_stack([dem_norm.ravel(), slope_norm.ravel()])
+    
+    # Final cleanup: ensure no NaN/Inf values
+    X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+    X = np.clip(X, 0, 1)
+    
     return X
 
 
@@ -114,6 +121,14 @@ def train_flood_classifier(
     """
     X = compute_topographic_features(dem)
     y = (water.reshape(-1) > float(threshold)).astype(np.uint8)
+    
+    # Ensure no NaN/Inf in X before training
+    n_nan_before = np.isnan(X).sum() + np.isinf(X).sum()
+    if n_nan_before > 0:
+        logger.warning(f"Found {n_nan_before} NaN/Inf values in features. Cleaning...")
+        X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+        X = np.clip(X, 0, 1)
+        logger.warning("Features cleaned successfully")
 
     logger.info(
         f"Training RandomForest: {n_estimators} trees, "
@@ -150,6 +165,11 @@ def predict_probability(model: RandomForestClassifier, dem: np.ndarray) -> np.nd
         Predicted inundation probability [0, 1] at each grid cell.
     """
     X = compute_topographic_features(dem)
+    
+    # Ensure no NaN/Inf before prediction
+    X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+    X = np.clip(X, 0, 1)
+    
     proba = model.predict_proba(X)
 
     if proba.shape[1] == 1:

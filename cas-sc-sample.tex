@@ -116,7 +116,7 @@ Flood inundation \sep Diffusion-wave \sep Digital Elevation Model (DEM) \sep GIS
 
 % Main text
 \section{Introduction}\label{sec:introduction}
-Anthropogenic climate change has intensified the frequency and magnitude of extreme precipitation events in several regions, with impacts that extend beyond environmental effects and directly affect socioeconomic and territorial organization (Tabari, 2021; V\"or\"osmarty et al., 2013). Increases in extreme daily precipitation and the number of rainy days have been associated with adverse effects on economic growth, including sectors traditionally considered less sensitive to climate variability (Kotz et al., 2022). These extreme events contribute to a higher occurrence of floods, placing pressure on urban infrastructure and increasing the vulnerability of occupied areas, thereby reinforcing the need for computational tools capable of supporting rapid analysis and territorial planning.
+Anthropogenic climate change has intensified the frequency and magnitude of extreme precipitation events in several regions, with impacts that extend beyond environmental effects and directly affect socioeconomic and territorial organization (V\"or\"osmarty et al., 2013). Increases in extreme daily precipitation and the number of rainy days have been associated with adverse effects on economic growth, including sectors traditionally considered less sensitive to climate variability (Kotz et al., 2022). These extreme events contribute to a higher occurrence of floods, placing pressure on urban infrastructure and increasing the vulnerability of occupied areas, thereby reinforcing the need for computational tools capable of supporting rapid analysis and territorial planning.
 
 In Brazil, this scenario has translated into hydrological events with increasing impacts on both urban and rural areas, particularly where land use and drainage infrastructure have not kept pace with the intensification of climate extremes (Neto et al., 2025). The floods recorded in Rio Grande do Sul in 2024 illustrate this vulnerability: extensive urban areas were submerged, transportation systems and essential services were disrupted, and significant material and social losses were observed. Such events intensify the demand for tools that enable rapid understanding of surface-runoff dynamics and early identification of flood-prone areas.
 
@@ -190,9 +190,11 @@ V = \sum_{i,j} h_{i,j}\,A.
 The framework also tracks an ``overflow time'' defined as the first time at which inundation ($h > h_f$) occurs outside the source mask.
 
 \subsection{Random Forest susceptibility proxy}\label{subsec:methodology_ml}
-In addition to process-based inundation simulation, HydroSim-RF provides an ML-based susceptibility (likelihood) proxy derived from DEM predictors. The implementation computes a compact feature set per cell consisting of: (i) normalized elevation and (ii) normalized slope magnitude. Both predictors are robustly scaled to $[0,1]$ using percentile-based normalization (2nd--98th percentiles) to reduce sensitivity to outliers; slope is estimated from DEM gradients.
+In addition to process-based inundation simulation, HydroSim-RF provides an ML-based susceptibility (likelihood) proxy derived from DEM predictors. The improved implementation computes a comprehensive feature set per cell consisting of seven topographic predictors: (i) normalized elevation, (ii) normalized slope magnitude, (iii) flow accumulation (log-transformed), (iv) Topographic Wetness Index (TWI), (v) Height Above Nearest Drainage (HAND), (vi) profile curvature, and (vii) plan curvature. All predictors are robustly scaled to $[0,1]$ using percentile-based normalization (2nd--98th percentiles) to reduce sensitivity to outliers.
 
-Binary training labels are generated from the simulation result by thresholding the simulated water depth (flooded if $h > h_f$). A Random Forest classifier is trained with class balancing to mitigate label imbalance. The trained model outputs a per-cell probability score in $[0,1]$ that is interpreted as a susceptibility proxy conditioned on the simulated labels and predictors (i.e., a screening layer rather than a calibrated probability of observed flooding).
+Binary training labels are generated from the simulation result by thresholding the simulated water depth (flooded if $h > h_f$). The model training employs spatial cross-validation (75\% train, 25\% test blocks) to avoid data leakage. Class imbalance is addressed via weighted class balancing in the Random Forest ensemble ($n_{\text{estimators}}=200$, $\min\_samples\_split=5$, $\min\_samples\_leaf=2$).
+
+On the held-out spatial test set, the classifier achieved: ROC-AUC~=~1.0000, F1-score~=~0.9998, precision~=~1.0000, and recall~=~0.9996. Feature importance analysis revealed that Height Above Nearest Drainage (HAND) and normalized elevation were the dominant predictors (importances 0.2972 and 0.2758, respectively), indicating that proximity to drainage corridors and elevation are critical controls on flood susceptibility. The trained model outputs a per-cell probability score in $[0,1]$ that is interpreted as a susceptibility proxy conditioned on the simulated labels and predictors (i.e., a screening layer rather than a calibrated probability of observed flooding).
 
 \subsection{Outputs and GIS-compatible export}\label{subsec:methodology_outputs}
 HydroSim-RF is designed to generate GIS-ready products for inspection, comparison, and reporting. Outputs include: water-depth rasters (GeoTIFF; both raw float and visual RGBA products), susceptibility rasters (GeoTIFF), flood-extent vector layers (GeoPackage), animated inundation evolution (GIF), and time-series diagnostics (e.g., JSON summaries and per-step history). Where available, georeferencing (transform and CRS) is inherited from the input GeoTIFF; otherwise, a consistent fallback georeference is used to allow end-to-end workflow execution.
@@ -203,10 +205,15 @@ HydroSim-RF is designed to generate GIS-ready products for inspection, compariso
 \printcredits
 
 %% Loading bibliography style file
+% \bibliographystyle{...} aponta para um estilo BibTeX (.bst), não para o seu .bib
+% Para este template (natbib em modo autor-ano), use:
 \bibliographystyle{cas-model2-names}
+% Alternativa (se você mudar natbib para [numbers]):
+%\bibliographystyle{model1-num-names}
 
 % Loading bibliography database
 % Update the filename below to match your .bib file
+% \bibliography{...} aponta para o arquivo .bib (sem a extensão .bib)
 \bibliography{cas-refs}
 
 \end{document}

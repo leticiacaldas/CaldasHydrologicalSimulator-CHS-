@@ -122,6 +122,19 @@ class FloodValidationModel:
         
         logger.info(f"🚀 Training Random Forest ({self.n_estimators} trees)...")
         
+        # Clean any NaN/Inf in training data before fitting
+        X_train_clean = np.nan_to_num(
+            cast(np.ndarray, self.X_train),
+            nan=0.0,
+            posinf=1.0,
+            neginf=0.0
+        )
+        X_train_clean = np.clip(X_train_clean, 0, 1)
+        
+        n_nan_before = np.isnan(cast(np.ndarray, self.X_train)).sum()
+        if n_nan_before > 0:
+            logger.warning(f"Cleaned {n_nan_before} NaN/Inf values from training data")
+        
         self.model = RandomForestClassifier(
             n_estimators=self.n_estimators,
             max_depth=15,
@@ -132,7 +145,7 @@ class FloodValidationModel:
             class_weight='balanced'  # Handle class imbalance
         )
         
-        self.model.fit(cast(np.ndarray, self.X_train), cast(np.ndarray, self.y_train))  # type: ignore
+        self.model.fit(X_train_clean, cast(np.ndarray, self.y_train))  # type: ignore
         
         logger.info(f"✅ Model trained successfully")
         
@@ -155,12 +168,21 @@ class FloodValidationModel:
         if self.model is None:
             raise ValueError("Call train() first")
         
-        # Predictions
+        # Predictions - clean data first
         X_test_arr = cast(np.ndarray, self.X_test)
         y_test_arr = cast(np.ndarray, self.y_test)
         
-        y_pred = self.model.predict(X_test_arr)  # type: ignore
-        y_proba = self.model.predict_proba(X_test_arr)[:, 1]  # type: ignore
+        # Clean any NaN/Inf in test data before prediction
+        X_test_clean = np.nan_to_num(
+            X_test_arr,
+            nan=0.0,
+            posinf=1.0,
+            neginf=0.0
+        )
+        X_test_clean = np.clip(X_test_clean, 0, 1)
+        
+        y_pred = self.model.predict(X_test_clean)  # type: ignore
+        y_proba = self.model.predict_proba(X_test_clean)[:, 1]  # type: ignore
         
         # Compute metrics
         self.metrics = {

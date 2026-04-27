@@ -339,6 +339,7 @@ def _prepare_spatial_domain(dem_path: str, vector_path: Optional[str], grid_redu
             cell_size = px
 
     # Rasterizar fontes (vetor)
+    
     if vector_path:
         gdf = gpd.read_file(vector_path)
         if gdf.crs is None and crs is not None:
@@ -1270,6 +1271,11 @@ def _compute_topographic_features(dem: np.ndarray) -> np.ndarray:
     else:
         slope_norm = np.zeros_like(slope, dtype=float)
     X = np.stack([dem_norm, slope_norm], axis=-1).reshape(H * W, 2)
+    
+    # Final cleanup to ensure no NaN/Inf
+    X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+    X = np.clip(X, 0, 1)
+    
     return X
 
 
@@ -1305,6 +1311,11 @@ def _train_flood_classifier(dem: np.ndarray, water: np.ndarray, threshold: float
     """
     X = _compute_topographic_features(dem)
     y = (water.reshape(-1) > float(threshold)).astype(np.uint8)
+    
+    # Ensure no NaN/Inf in X before training
+    X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+    X = np.clip(X, 0, 1)
+    
     clf = RandomForestClassifier(
         n_estimators=int(n_estimators),
         max_depth=int(max_depth),
@@ -1318,6 +1329,11 @@ def _train_flood_classifier(dem: np.ndarray, water: np.ndarray, threshold: float
 
 def _predict_probability(model: RandomForestClassifier, dem: np.ndarray) -> np.ndarray:
     X = _compute_topographic_features(dem)
+    
+    # Ensure no NaN/Inf before prediction
+    X = np.nan_to_num(X, nan=0.0, posinf=1.0, neginf=0.0)
+    X = np.clip(X, 0, 1)
+    
     proba = model.predict_proba(X)
     if proba.shape[1] == 1:
         p1 = np.zeros((dem.size,), dtype=float)
@@ -1345,7 +1361,7 @@ def _plot_probability_overlay(prob: np.ndarray, transform, crs, rf_threshold: fl
         ctx.add_basemap(ax, crs=crs, source='CartoDB.Positron')
     ax.set_title("RF Flood Probability")
     ax.set_axis_off()
-    plt.colorbar(im, ax=ax, fraction=0.026, pad=0.02, label="Probability")
+    plt.colorbar(im, ax=ax, fraction=0.026, pad=0.02, label="Probability")  # type: ignore
     st.pyplot(fig, clear_figure=True)
 
 

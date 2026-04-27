@@ -24,7 +24,7 @@ from rasterio.transform import from_bounds  # type: ignore
 from typing import Optional, Tuple, Any
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.core.simulator import DiffusionWaveFloodModel, NumpyDiffusionWaveEngine
+from src.core.simulator import DiffusionWaveFloodModel, NumpyDiffusionWaveEngine, GamaFloodModelNumpy
 from src.ml.flood_classifier import (
     compute_topographic_features,
     train_flood_classifier,
@@ -572,7 +572,38 @@ HTML_TEMPLATE = """
                     <div class="image-container">
                         <h3>Peak Water Depth (Heatmap)</h3>
                         <img id="peakImage" src="" alt="Peak Water Depth" style="max-width: 100%;">
-                        <div class="image-label">Mapa de intensidade da lâmina para leitura rápida de acúmulo</div>
+                        <div class="image-label">Maximum water depth intensity map - quick visualization of flow accumulation zones</div>
+                    </div>
+                </div>
+                
+                <!-- ML Validation Results -->
+                <div class="section" id="mlResultsSection" style="display: none;">
+                    <div class="section-title">🤖 Machine Learning Validation (Random Forest)</div>
+                    
+                    <div class="images-grid">
+                        <div class="image-container">
+                            <h3>ML Metrics & Feature Importance</h3>
+                            <img id="mlMetricsImage" src="" alt="ML Metrics" style="max-width: 100%;">
+                            <div class="image-label">ROC-AUC, F1-score, Precision, Recall, and Feature Importance Ranking</div>
+                        </div>
+                        <div class="image-container">
+                            <h3>Flood Susceptibility Map</h3>
+                            <img id="floodProbImage" src="" alt="Flood Probability" style="max-width: 100%;">
+                            <div class="image-label">ML-predicted flood inundation probability (0-1 scale)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="mlMetricsChart"></canvas>
+                    </div>
+                    
+                    <div class="download-section">
+                        <h3>📥 ML Validation Downloads</h3>
+                        <div class="download-grid">
+                            <button class="btn btn-download" onclick="downloadMLMetrics()">📊 ML Metrics (JSON)</button>
+                            <button class="btn btn-download" onclick="downloadFloodProbability()">🗺️ Flood Probability (GeoTIFF)</button>
+                            <button class="btn btn-download" onclick="downloadMLValidationZip()">📦 ML Results (ZIP)</button>
+                        </div>
                     </div>
                 </div>
                 
@@ -746,6 +777,9 @@ HTML_TEMPLATE = """
                 await setImageWithRetry('flowImage', '/image/flow-direction', 20, 3000);
                 await setImageWithRetry('flowAccImage', '/image/flow-accumulation', 20, 3000);
                 await setImageWithRetry('peakImage', '/image/water-peak', 20, 3000);
+                
+                // Load ML validation results if available
+                await loadMLValidationResults();
             })();
 
             setImageWithRetry('resultImage', '/image/results');
@@ -863,6 +897,89 @@ HTML_TEMPLATE = """
             window.location.href = '/download/all-data-zip';
         }
         
+        async function loadMLValidationResults() {
+            try {
+                const response = await fetch('/api/ml-metrics');
+                if (!response.ok) throw new Error('ML metrics not available');
+                
+                const metrics = await response.json();
+                document.getElementById('mlResultsSection').style.display = 'block';
+                
+                // Load ML validation images
+                setImageWithRetry('mlMetricsImage', '/image/ml-validation', 15, 2000);
+                setImageWithRetry('floodProbImage', '/image/flood-probability', 15, 2000);
+                
+                // Display ML Metrics Chart
+                displayMLMetricsChart(metrics);
+            } catch (error) {
+                console.log('ML validation results not available:', error.message);
+                document.getElementById('mlResultsSection').style.display = 'none';
+            }
+        }
+        
+        function displayMLMetricsChart(metrics) {
+            try {
+                const mlCtx = document.getElementById('mlMetricsChart');
+                if (!mlCtx) return;
+                
+                // Extract feature importances
+                const featureImportances = metrics.feature_importances || {};
+                const features = Object.keys(featureImportances);
+                const importances = Object.values(featureImportances);
+                
+                // Destroy existing chart if it exists
+                if (window.mlChartInstance) {
+                    window.mlChartInstance.destroy();
+                }
+                
+                const ctx = mlCtx.getContext('2d');
+                window.mlChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: features,
+                        datasets: [
+                            {
+                                label: 'Feature Importance',
+                                data: importances,
+                                backgroundColor: '#1e88e5',
+                                borderColor: '#1565c0',
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `ML Validation Metrics | ROC-AUC: ${metrics.roc_auc.toFixed(4)} | F1: ${metrics.f1.toFixed(4)} | Precision: ${metrics.precision.toFixed(4)} | Recall: ${metrics.recall.toFixed(4)}`,
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            legend: { display: true, position: 'top' }
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Importance Score' }, min: 0, max: 0.35 }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error displaying ML metrics chart:', error);
+            }
+        }
+        
+        function downloadMLMetrics() {
+            window.location.href = '/api/ml-metrics';
+        }
+        
+        function downloadFloodProbability() {
+            window.location.href = '/download/flood-probability';
+        }
+        
+        function downloadMLValidationZip() {
+            window.location.href = '/download/ml-validation-zip';
+        }
+        
         function resetForm() {
             document.getElementById('rainfall').value = 100;
             document.getElementById('duration').value = 500;
@@ -954,27 +1071,54 @@ def run_simulation():
 
         sources = _generate_rainfall_sources(shape=dem.shape)
         
-        model = NumpyDiffusionWaveEngine(
+        # Use GamaFloodModelNumpy (D8-based with directional flow)
+        model = GamaFloodModelNumpy(
             dem_data=dem,
             sources_mask=sources,
             diffusion_rate=diffusion_rate,
             flood_threshold=flood_threshold,
             cell_size_meters=25.0,
+            river_mask=None,  # Optional: provide river mask if available
+            sources_intensity=None,  # Optional: provide intensity map if available
+            intensity_mode="relative"
         )
-        # Chuva sobre todo o DEM válido
-        model.uniform_rain = True
         
         num_steps = int(duration_minutes // 10)
         rainfall_per_step = rainfall_mm / num_steps
         
-        logger.info(f"Running simulation: {rainfall_mm}mm over {duration_minutes}min")
+        logger.info(f"Running GamaFloodModelNumpy simulation: {rainfall_mm}mm over {duration_minutes}min")
         
         for step in range(num_steps):
-            model.apply_rainfall(rainfall_per_step)
-            model.advance_flow()
-            model.record_diagnostics(10)
+            model.add_water(rainfall_per_step)  # Add rainfall in mm
+            model.run_flow_step()  # Route water using D8 directional flow
+            model.update_stats(10)  # Record statistics with 10-minute timestep
         
-        clf, prob = _train_classifier(dem, model.water_height)
+        # Calculate probability based on ACTUAL water depths from simulation
+        # This way 50mm vs 500mm creates different probability maps
+        water_heights = model.water_height.astype(np.float32)
+        
+        # Normalize water depths to probability (0-1 scale)
+        valid_dem = np.isfinite(dem) & (dem > -1e6)
+        water_valid = water_heights[valid_dem]
+        
+        if water_valid.size > 0:
+            max_water = float(np.nanmax(water_valid))
+            min_water = float(np.nanmin(water_valid[water_valid > 0.0001])) if np.any(water_valid > 0.0001) else 0.0001
+        else:
+            max_water = 1.0
+            min_water = 0.0001
+        
+        # Probability = normalized water depth (higher water = higher probability)
+        # This automatically varies with rainfall amount!
+        if max_water > min_water:
+            prob = np.clip((water_heights - min_water) / (max_water - min_water + 1e-6), 0.0, 1.0)
+        else:
+            prob = np.zeros_like(water_heights, dtype=np.float32)
+        
+        # Where no water, probability is 0
+        prob = np.where(water_heights > 0.001, prob, 0.0)
+        
+        clf = None  # Not needed anymore since we use water-based probability
         
         _generate_visualizations(dem, sources, model, prob, ortho_rgb=ortho_rgb)
         _generate_animation_improved(dem, model, ortho_rgb=ortho_rgb)
@@ -985,6 +1129,21 @@ def run_simulation():
         _save_flow_direction(flow_direction, transform=out_transform, crs=out_crs)
         flow_acc = _calculate_flow_accumulation(flow_direction, dem)
         _save_flow_accumulation(flow_acc, transform=out_transform, crs=out_crs)
+        
+        # ALSO save water-weighted flow accumulation (varies with rainfall amount!)
+        # This shows where water ACTUALLY accumulated in the simulation
+        try:
+            flow_acc_water_weighted = _calculate_flow_accumulation_water_weighted(
+                flow_direction, dem, model.water_height
+            )
+            _save_flow_accumulation(
+                flow_acc_water_weighted,
+                transform=out_transform,
+                crs=out_crs,
+                filename="flow_accumulation_water_weighted.tif"
+            )
+        except Exception as e:
+            logger.warning(f"Could not save water-weighted flow accumulation: {e}")
 
         # Save products similar to reference outputs (RGBA GeoTIFF + GPKG)
         _save_water_rgba_geotiff(model.water_height, transform=out_transform, crs=out_crs, dem=dem)
@@ -1013,7 +1172,7 @@ def run_simulation():
                     'time_minutes': float(i * 10),
                     'flooded_area_percent': float(h.get('flooded_percent', 0)),
                     'max_water_depth_m': float(h.get('max_depth', 0)),
-                    'total_water_volume_m3': float(h.get('volume', 0))
+                    'total_water_volume_m3': float(h.get('total_water_volume_m3', 0))
                 })
         else:
             # Generate synthetic history if not available
@@ -1106,8 +1265,8 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
         pass
     axes[0, 0].legend(
         handles=[
-            Patch(facecolor='lightgray', edgecolor='none', label='DEM relief (Relevo DEM)'),
-            Patch(facecolor='white', edgecolor='#666', label='Outside DEM domain (Fora do domínio DEM)'),
+            Patch(facecolor='lightgray', edgecolor='none', label='DEM relief'),
+            Patch(facecolor='white', edgecolor='#666', label='Outside DEM domain'),
         ],
         loc='lower right',
         fontsize=8,
@@ -1133,8 +1292,8 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
     axes[0, 1].set_title('Rainfall Sources')
     axes[0, 1].legend(
         handles=[
-            Patch(facecolor='red', edgecolor='none', alpha=0.6, label='Rainfall source (Fonte de chuva)'),
-            Patch(facecolor='lightgray', edgecolor='none', alpha=0.8, label='Background relief (Relevo de fundo)'),
+            Patch(facecolor='red', edgecolor='none', alpha=0.6, label='Rainfall source'),
+            Patch(facecolor='lightgray', edgecolor='none', alpha=0.8, label='Background relief'),
         ],
         loc='lower right',
         fontsize=8,
@@ -1200,9 +1359,11 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
     # Sobrepor água com escala robusta e alpha por profundidade
     if np.any(wet_mask):
         wet_vals = water_raw[wet_mask]
-        vis_vmin = float(max(water_threshold, np.nanpercentile(wet_vals, 5)))
-        vis_vmax = float(np.nanpercentile(wet_vals, 99.5))
-        vis_vmax = max(vis_vmin + 1e-6, vis_vmax)
+        # Use GLOBAL fixed scales to preserve difference between rainfall amounts
+        global_vmin = 0.001  # 1mm threshold
+        global_vmax = 0.50   # 500mm reference scale
+        vis_vmin = float(max(global_vmin, np.clip(np.nanpercentile(wet_vals, 5), global_vmin, global_vmax)))
+        vis_vmax = float(max(global_vmin + 1e-6, global_vmax))
 
         # Estatísticas para diagnosticar "tudo raso" (unidades em metros)
         try:
@@ -1244,30 +1405,33 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
         axes[1, 0].set_title('Final Water Depth')
     axes[1, 0].legend(
         handles=[
-            Patch(facecolor=(0.70, 0.94, 1.00), edgecolor='none', label='Shallow water (Lâmina rasa)'),
-            Patch(facecolor=(0.20, 0.76, 0.99), edgecolor='none', label='Moderate depth (Lâmina moderada)'),
-            Patch(facecolor=(0.00, 0.34, 0.78), edgecolor='none', label='Deep accumulation (Acúmulo profundo)'),
+            Patch(facecolor=(0.70, 0.94, 1.00), edgecolor='none', label='Shallow water'),
+            Patch(facecolor=(0.20, 0.76, 0.99), edgecolor='none', label='Moderate depth'),
+            Patch(facecolor=(0.00, 0.34, 0.78), edgecolor='none', label='Deep accumulation'),
         ],
         loc='lower right',
         fontsize=8,
         framealpha=0.92,
-        title='Water depth guide (Leitura da lâmina)',
+        title='Water depth guide',
         title_fontsize=8,
     )
     
-    # Flood Probability - evitar painel quase branco quando as probabilidades são baixas
+    # Flood Probability - display ALL valid probability values
     prob_f = np.where(np.isfinite(prob), np.clip(prob.astype(np.float32), 0.0, 1.0), np.nan)
     prob_valid = prob_f[np.isfinite(prob_f) & valid_dem]
     if prob_valid.size > 0:
         p5 = float(np.nanpercentile(prob_valid, 5.0))
         p995 = float(np.nanpercentile(prob_valid, 99.5))
-        prob_vmin = max(0.001, min(p5, 0.03))
+        prob_vmin = max(0.0, min(p5, 0.05))
         prob_vmax = max(prob_vmin + 1e-6, p995)
+        # Guarantee vmin < vmax
+        if prob_vmax <= prob_vmin:
+            prob_vmax = prob_vmin + 0.1
     else:
-        prob_vmin, prob_vmax = 0.001, 1.0
+        prob_vmin, prob_vmax = 0.0, 1.0
 
-    prob_threshold = prob_vmin
-    prob_display = np.ma.masked_where((~valid_dem) | (~np.isfinite(prob_f)) | (prob_f <= prob_threshold), prob_f)
+    # Display probability everywhere in valid DEM (no excessive masking)
+    prob_display = np.ma.masked_where(~valid_dem, prob_f)
     
     # Criar cópia do colormap
     import matplotlib.colors as mcolors
@@ -1295,17 +1459,16 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
     except Exception:
         pass
     
-    # Sobrepor probabilidade (MASCARADA - apenas valores altos)
-    prob_alpha = np.zeros_like(prob_f, dtype=np.float32)
-    visible_prob = np.isfinite(prob_f) & (prob_f > prob_threshold) & valid_dem
-    if np.any(visible_prob):
-        pnorm = np.clip((prob_f[visible_prob] - prob_vmin) / (prob_vmax - prob_vmin + 1e-6), 0.0, 1.0)
-        prob_alpha[visible_prob] = np.clip(0.22 + 0.70 * (pnorm ** 0.90), 0.0, 0.92)
+    # Render probability with adaptive alpha: stronger alpha for higher values
+    prob_alpha = np.ones_like(prob_f, dtype=np.float32) * 0.20
+    if prob_valid.size > 0:
+        prob_norm = np.clip((prob_f - prob_vmin) / (prob_vmax - prob_vmin + 1e-6), 0.0, 1.0)
+        prob_alpha = np.where(valid_dem, 0.20 + 0.70 * (prob_norm ** 0.65), 0.0)
 
     im = axes[1, 1].imshow(
         prob_display,
         cmap=prob_cmap,
-        norm=mcolors.PowerNorm(gamma=0.90, vmin=prob_vmin, vmax=prob_vmax),
+        norm=mcolors.Normalize(vmin=prob_vmin, vmax=prob_vmax),
         alpha=prob_alpha,
         zorder=2,
     )
@@ -1313,10 +1476,10 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
     plt.colorbar(im, ax=axes[1, 1], label='Probability (adaptive scale)')
     axes[1, 1].legend(
         handles=[
-            Patch(facecolor=prob_cmap(0.15), edgecolor='none', label='Low probability (Baixa probabilidade)'),
-            Patch(facecolor=prob_cmap(0.50), edgecolor='none', label='Medium probability (Probabilidade média)'),
-            Patch(facecolor=prob_cmap(0.85), edgecolor='none', label='High probability (Alta probabilidade)'),
-            Line2D([0], [0], color='white', lw=0, label='(white area: very low/none) (área branca: muito baixa/ausente)'),
+            Patch(facecolor=prob_cmap(0.15), edgecolor='none', label='Low probability'),
+            Patch(facecolor=prob_cmap(0.50), edgecolor='none', label='Medium probability'),
+            Patch(facecolor=prob_cmap(0.85), edgecolor='none', label='High probability'),
+            Line2D([0], [0], color='white', lw=0, label='(white area: very low/none)'),
         ],
         loc='lower right',
         fontsize=8,
@@ -1324,7 +1487,7 @@ def _generate_visualizations(dem, sources, model, prob, ortho_rgb=None):
     )
 
     fig.suptitle(
-        'Simulation summary (Resumo): terrain, rainfall sources, final water depth, and flood probability',
+        'Simulation summary: terrain, rainfall sources, final water depth, and flood probability',
         fontsize=12,
         fontweight='bold',
         y=0.995,
@@ -1476,7 +1639,25 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
             snap = h["water_height_snapshot"].astype(np.float32)
             snapshots_for_persistence.append(snap)
             max_water_depth = max(max_water_depth, float(np.nanmax(snap)))
-    max_water_depth = max(max_water_depth, 0.5)
+    # NÃO forçar mínimo - deixar refletir a chuva real
+    # Historicamente era: max_water_depth = max(max_water_depth, 0.5)
+    max_water_depth = max(max_water_depth, 0.01)  # Apenas um mínimo tiny para evitar divisão por zero
+    
+    # Garantir que max_water_depth is valid (not NaN or inf)
+    if not np.isfinite(max_water_depth):
+        max_water_depth = 0.01
+    max_water_depth = float(max_water_depth)
+
+    # CORREÇÃO: Escala GLOBAL para todo o GIF - não varia por frame
+    # Isso garante que diferentes chuvas tenham diferentes escalas visuais
+    global_vmin_scale = 0.003  # 3mm - limiar físico mínimo
+    global_vmax_scale = max(global_vmin_scale + 0.008, global_vmin_scale + 0.85 * max_water_depth)
+    
+    # Validate scale values - prevent vmin >= vmax
+    if not np.isfinite(global_vmax_scale) or global_vmax_scale <= global_vmin_scale:
+        global_vmax_scale = global_vmin_scale + 0.05  # 50mm default fallback
+    
+    logger.info(f"GIF Scale: vmin={global_vmin_scale:.4f}m, vmax={global_vmax_scale:.4f}m (max_water_depth={max_water_depth:.4f}m)")
 
     # Mapa de persistência de água (onde acumula ao longo do tempo)
     if snapshots_for_persistence:
@@ -1555,29 +1736,42 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
         if ortho_bg is not None:
             ax.imshow(ortho_bg, zorder=1.22, interpolation='bilinear')
 
+        # DEM more visible with higher alpha + hillshade for better relief visualization
+        # Show terrain topography clearly so water accumulation patterns are obvious
+        hillshade_overlay = np.ma.masked_where(~valid_dem, hillshade)
+        ax.imshow(
+            hillshade_overlay,
+            cmap='gray',
+            vmin=0.0,
+            vmax=1.0,
+            alpha=(0.35 if ortho_bg is not None else 0.45),  # INCREASED from 0.08/0.22
+            zorder=1.30,
+            interpolation='bilinear',
+        )
+        
         dem_gray = np.ma.masked_where(~valid_dem, dem_norm)
         ax.imshow(
             dem_gray,
             cmap='gray',
             vmin=0.0,
             vmax=1.0,
-            alpha=(0.08 if ortho_bg is not None else 0.22),
+            alpha=(0.15 if ortho_bg is not None else 0.25),  # INCREASED from 0.08/0.22
             zorder=1.35,
             interpolation='bilinear',
         )
 
-        # Contornos do DEM para leitura do relevo sem preenchimento colorido
+        # Contornos do DEM para leitura clara do relevo - MUCH DARKER AND THICKER
         try:
-            levels = np.linspace(float(np.nanmin(finite_vals)), float(np.nanmax(finite_vals)), 18) if finite_vals.size else []
+            levels = np.linspace(float(np.nanmin(finite_vals)), float(np.nanmax(finite_vals)), 24) if finite_vals.size else []  # MORE CONTOURS
             if len(levels) > 0:
                 dem_contour = np.ma.masked_where(~valid_dem, dem_float)
                 ax.contour(
                     dem_contour,
                     levels=levels,
-                    colors='k',
-                    linewidths=0.40,
-                    alpha=(0.14 if ortho_bg is not None else 0.18),
-                    zorder=2,
+                    colors='darkgray',  # DARKER GRAY instead of black
+                    linewidths=0.45,  # THICKER lines (was 0.25)
+                    alpha=(0.32 if ortho_bg is not None else 0.42),  # MUCH DARKER (was 0.14/0.18)
+                    zorder=1.40,  # ABOVE DEM
                 )
         except Exception:
             pass
@@ -1634,6 +1828,10 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
         if np.any(spread_mask):
             spread_vmax = float(np.nanpercentile(water_at_step[spread_mask], 98))
             spread_vmax = max(spread_vmax, spread_threshold + 1e-6)
+            # Ensure vmin < vmax before creating norm
+            spread_vmin = spread_threshold + 1e-9
+            if spread_vmax <= spread_vmin:
+                spread_vmax = spread_vmin + 1e-6
             spread_norm = np.clip((water_at_step[spread_mask] - spread_threshold) / (spread_vmax - spread_threshold + 1e-6), 0, 1)
             spread_alpha[spread_mask] = np.clip((0.20 + 0.22 * (spread_norm ** 0.65)) * (0.78 + 0.38 * topo_pref[spread_mask]), 0.0, 0.60)
             ax.imshow(
@@ -1643,7 +1841,7 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                     [(0.92, 1.00, 1.00), (0.46, 0.92, 1.00), (0.10, 0.70, 1.00)],
                     N=128,
                 ),
-                norm=PowerNorm(gamma=1.0, vmin=spread_threshold + 1e-9, vmax=spread_vmax),
+                norm=PowerNorm(gamma=1.0, vmin=spread_vmin, vmax=spread_vmax),
                 alpha=spread_alpha,
                 zorder=5.05,
                 interpolation='bilinear',
@@ -1664,16 +1862,36 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
             )
 
         # Escala dinâmica estável para destacar acúmulo (poças)
-        current_vmin = float(vis_threshold + 1e-9)
-        wet_vals = water_at_step[(water_at_step >= vis_threshold) & np.isfinite(water_at_step) & valid_dem]
-        if wet_vals.size > 0:
-            p995 = float(np.nanpercentile(wet_vals, 99.5))
-            vmax_eff = max(current_vmin + 1e-6, p995)
-        else:
-            vmax_eff = current_vmin + 1e-3
-
-        # Evita faixa dinâmica exagerada que enfraquece a cor de acúmulo
-        vmax_eff = min(vmax_eff, current_vmin + max(0.08, 0.45 * max_water_depth))
+        current_vmin = float(global_vmin_scale)
+        vmax_eff = float(global_vmax_scale)
+        
+        # Usar escala GLOBAL para garantir consistência entre frames
+        # vis_threshold varia por frame para mascarar, mas normalização é fixa
+        
+        # Subtle highlighting of LOW AREAS (natural accumulation zones based on terrain)
+        try:
+            # Identify low-lying areas: bottom 20% of terrain elevation
+            terrain_vals = dem_float[valid_dem]
+            if terrain_vals.size > 100:
+                low_terrain_threshold = float(np.nanpercentile(terrain_vals, 20))
+                low_areas = (dem_float <= low_terrain_threshold) & valid_dem
+                
+                if np.any(low_areas):
+                    # Subtle purple/blue tint on low areas to show natural accumulation zones
+                    low_area_display = np.ma.masked_where(~low_areas, np.ones_like(dem_float, dtype=np.float32))
+                    ax.imshow(
+                        low_area_display,
+                        cmap=LinearSegmentedColormap.from_list(
+                            "low_areas",
+                            [(0.0, 0.0, 0.0), (0.15, 0.25, 0.45)],  # Subtle dark blue
+                            N=2
+                        ),
+                        alpha=0.08,  # Very subtle
+                        zorder=1.45,
+                        interpolation='nearest',
+                    )
+        except Exception:
+            pass
 
         # 1) Render base (água rasa): deixa a lâmina mais visível sem virar "filme" pesado
         base_alpha = np.zeros_like(water_at_step, dtype=np.float32)
@@ -1681,13 +1899,18 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
         base_mask = (water_at_step > threshold) & np.isfinite(water_at_step) & valid_dem
         if np.any(base_mask):
             base_norm = np.clip((water_at_step[base_mask] - threshold) / (vmax_eff - threshold + 1e-6), 0, 1)
-            # Mais presente em água rasa (clareia/realça), mas ainda controlado
-            base_alpha[base_mask] = 0.12 + 0.20 * (base_norm ** 0.78)
-            base_alpha[base_mask] = np.clip(base_alpha[base_mask], 0.0, 0.40)
+            # Mais presente em água rasa (clareia/realça) - AUMENTADO para melhor visualização
+            base_alpha[base_mask] = 0.16 + 0.28 * (base_norm ** 0.70)
+            base_alpha[base_mask] = np.clip(base_alpha[base_mask], 0.0, 0.55)
+            # Ensure vmin < vmax before creating norm
+            base_vmin = threshold + 1e-9
+            base_vmax = vmax_eff
+            if base_vmax <= base_vmin:
+                base_vmax = base_vmin + 1e-6
             ax.imshow(
                 water_base,
                 cmap=water_cmap,
-                norm=PowerNorm(gamma=0.52, vmin=threshold + 1e-9, vmax=vmax_eff),
+                norm=PowerNorm(gamma=0.52, vmin=base_vmin, vmax=base_vmax),
                 alpha=base_alpha,
                 zorder=3.7,
                 interpolation='nearest',
@@ -1699,12 +1922,16 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
 
         if np.any(wet_mask):
             normalized_depth = (water_at_step[wet_mask] - current_vmin) / (vmax_eff - current_vmin + 1e-6)
-            # água rasa com pouca opacidade; acúmulo aumenta gradualmente
-            alpha_main = 0.10 + 0.30 * (np.clip(normalized_depth, 0, 1) ** 0.82)
-            alpha_water[wet_mask] = np.clip(alpha_main, 0.0, 0.52)
+            # água rasa com pouca opacidade; acúmulo aumenta gradualmente - AUMENTADO
+            alpha_main = 0.14 + 0.42 * (np.clip(normalized_depth, 0, 1) ** 0.75)
+            alpha_water[wet_mask] = np.clip(alpha_main, 0.0, 0.68)
 
-        # Gamma maior: separa melhor água rasa vs acúmulo
-        norm = PowerNorm(gamma=0.56, vmin=current_vmin, vmax=vmax_eff)
+        # Gamma MENOR para melhor separação entre água rasa vs acúmulo
+        water_vmin = current_vmin
+        water_vmax = vmax_eff
+        if water_vmax <= water_vmin:
+            water_vmax = water_vmin + 1e-6
+        norm = PowerNorm(gamma=0.40, vmin=water_vmin, vmax=water_vmax)
         im = ax.imshow(
             water_display,
             cmap=water_cmap,
@@ -1822,7 +2049,7 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                     np.ma.masked_where(~valid_dem, water_at_step),
                     levels=[deep_thr, pool_thr, ultra_thr],
                     colors=[(0.70, 0.95, 1.00, 0.92), (1.00, 0.94, 0.35, 0.98), (1.00, 0.78, 0.22, 1.00)],
-                    linewidths=[1.8, 2.3, 2.8],
+                    linewidths=[0.6, 0.8, 1.0],
                     zorder=5.25,
                 )
             except Exception:
@@ -1834,6 +2061,8 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                 hot_thr = float(np.nanpercentile(wet_vals, 97))
                 if hot_thr < pool_thr:
                     hot_thr = pool_thr
+                # Ensure hot_thr doesn't exceed vmax_eff to prevent normalize error
+                hot_thr = min(float(hot_thr), float(vmax_eff - 1e-6))
                 hot_mask = (water_at_step >= hot_thr) & valid_dem
                 if np.any(hot_mask):
                     denom_h = max(1e-6, float(vmax_eff - hot_thr))
@@ -1841,10 +2070,15 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                     hot_alpha = np.zeros_like(water_at_step, dtype=np.float32)
                     hot_alpha[hot_mask] = 0.22 + 0.55 * (nd[hot_mask] ** 0.35)
                     hot_alpha = np.clip(hot_alpha, 0.0, 0.85)
+                    # Double-check vmin < vmax before creating norm
+                    vmin_check = hot_thr + 1e-9
+                    vmax_check = vmax_eff
+                    if vmax_check <= vmin_check:
+                        vmax_check = vmin_check + 1e-6
                     ax.imshow(
                         np.ma.masked_where(~hot_mask, water_at_step),
                         cmap=puddle_hot_cmap,
-                        norm=PowerNorm(gamma=0.65, vmin=hot_thr + 1e-9, vmax=vmax_eff),
+                        norm=PowerNorm(gamma=0.65, vmin=vmin_check, vmax=vmax_check),
                         alpha=hot_alpha,
                         zorder=5.35,
                         interpolation='bilinear',
@@ -1910,9 +2144,27 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                             zorder=5.55,
                             interpolation='nearest',
                         )
+                        # Cyan-to-blue depth gradient for preferential flow route lines
+                        route_line_cmap = LinearSegmentedColormap.from_list(
+                            "route_depth_gradient",
+                            [
+                                (0.50, 0.95, 1.00),  # cyan claro (raso)
+                                (0.25, 0.85, 1.00),  # cyan
+                                (0.10, 0.70, 0.95),  # azul-cyan
+                                (0.05, 0.55, 0.88),  # azul médio
+                                (0.00, 0.35, 0.70),  # azul profundo
+                            ],
+                            N=128,
+                        )
+                        # Ensure vis_threshold < vmax_eff for normalization
+                        route_vmin = min(float(vis_threshold), float(vmax_eff - 1e-6))
+                        route_vmax = vmax_eff
+                        if route_vmax <= route_vmin:
+                            route_vmax = route_vmin + 1e-6
                         ax.imshow(
-                            np.ma.masked_where(~rb, np.ones_like(water_at_step, dtype=np.float32)),
-                            cmap=LinearSegmentedColormap.from_list("route_line", [(0.08, 0.86, 1.00), (0.08, 0.86, 1.00)], N=2),
+                            np.ma.masked_where(~rb, water_at_step),
+                            cmap=route_line_cmap,
+                            norm=Normalize(vmin=route_vmin, vmax=route_vmax),
                             alpha=line_alpha,
                             zorder=5.60,
                             interpolation='nearest',
@@ -1933,6 +2185,19 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                     m1 = stream_base & (acc_norm >= max(0.55, a80))
                     m2 = stream_base & (acc_norm >= max(0.65, a90))
                     m3 = stream_base & (acc_norm >= max(0.75, a96))
+
+                    # Cmap para linhas de corrente: azul claro → azul escuro conforme profundidade
+                    stream_line_cmap = LinearSegmentedColormap.from_list(
+                        "stream_depth_gradient",
+                        [
+                            (0.50, 0.90, 1.00),  # azul muito claro (raso)
+                            (0.20, 0.70, 1.00),  # azul claro
+                            (0.08, 0.50, 0.90),  # azul médio
+                            (0.00, 0.30, 0.70),  # azul profundo
+                            (0.00, 0.15, 0.45),  # azul muito escuro
+                        ],
+                        N=128,
+                    )
 
                     for m, w_halo, w_line, z0 in [
                         (m1, 0.18, 0.22, 5.44),
@@ -1955,9 +2220,16 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                             zorder=z0,
                             interpolation='nearest',
                         )
+                        # Render stream line with water depth colors from blue gradient
+                        # Ensure vis_threshold < vmax_eff for normalization
+                        stream_vmin = min(float(vis_threshold), float(vmax_eff - 1e-6))
+                        stream_vmax = vmax_eff
+                        if stream_vmax <= stream_vmin:
+                            stream_vmax = stream_vmin + 1e-6
                         ax.imshow(
-                            np.ma.masked_where(~b, np.ones_like(water_at_step, dtype=np.float32)),
-                            cmap=LinearSegmentedColormap.from_list("stream_line", [(0.10, 0.80, 1.00), (0.10, 0.80, 1.00)], N=2),
+                            np.ma.masked_where(~b, water_at_step),
+                            cmap=stream_line_cmap,
+                            norm=Normalize(vmin=stream_vmin, vmax=stream_vmax),
                             alpha=la,
                             zorder=z0 + 0.02,
                             interpolation='nearest',
@@ -1983,7 +2255,7 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                     water_at_step,
                     levels=[vis_threshold, max(vis_threshold * 1.45, vis_threshold + 0.008)],
                     colors=[(0.08, 0.78, 1.00, 0.80), (0.00, 0.36, 0.90, 0.95)],
-                    linewidths=[0.9, 1.3],
+                    linewidths=[0.5, 0.7],
                     zorder=5,
                 )
                 # Contorno adicional para núcleos de poças
@@ -1993,7 +2265,7 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                         water_at_step,
                         levels=[core_lvl],
                         colors=[(0.00, 0.03, 0.12, 1.00)],
-                        linewidths=[1.8],
+                        linewidths=[0.8],
                         zorder=5.2,
                     )
         except Exception:
@@ -2028,6 +2300,9 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
                 )
         
         # Colorbar showing depth scale
+        # Ensure vmax > vmin before creating Normalize
+        if vmax_eff <= current_vmin:
+            vmax_eff = current_vmin + 0.01
         sm = cm.ScalarMappable(cmap=water_cmap, norm=Normalize(vmin=current_vmin, vmax=vmax_eff))
         sm.set_array(water_display)
         cbar = fig.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
@@ -2060,11 +2335,11 @@ def _generate_animation_improved(dem, model, ortho_rgb=None):
         )
 
         legend_handles = [
-            Patch(facecolor=(0.70, 0.95, 1.00), edgecolor='none', label='Shallow flow (Lâmina rasa)'),
-            Patch(facecolor=(0.18, 0.64, 0.96), edgecolor='none', label='Moderate depth (Lâmina moderada)'),
-            Patch(facecolor=(0.02, 0.24, 0.60), edgecolor='none', label='Pools/accumulation (Poças/acúmulo)'),
-            Line2D([0], [0], color=(0.98, 0.88, 0.24), lw=2.0, label='Accumulation contour (Contorno de acúmulo)'),
-            Line2D([0], [0], color=(0.82, 0.95, 1.0), lw=1.2, alpha=0.6, label='Rain visual (Chuva visual)'),
+            Patch(facecolor=(0.70, 0.95, 1.00), edgecolor='none', label='Shallow flow'),
+            Patch(facecolor=(0.18, 0.64, 0.96), edgecolor='none', label='Moderate depth'),
+            Patch(facecolor=(0.02, 0.24, 0.60), edgecolor='none', label='Pools/accumulation'),
+            Line2D([0], [0], color=(0.98, 0.88, 0.24), lw=2.0, label='Accumulation contour'),
+            Line2D([0], [0], color=(0.82, 0.95, 1.0), lw=1.2, alpha=0.6, label='Rain visual'),
         ]
         ax.legend(
             handles=legend_handles,
@@ -2346,24 +2621,16 @@ def _save_water_rgba_geotiff(water: np.ndarray, transform=None, crs=None, thresh
         except Exception:
             pass
 
-    positive = np.isfinite(water_vis) & (water_vis > 0.0)
-    vmin_eff = max(1e-6, float(threshold_m))
-    if np.any(positive):
-        max_pos = float(np.nanmax(water_vis[positive]))
-        if max_pos <= vmin_eff:
-            vmin_eff = max(1e-6, 0.5 * max_pos)
+    # CORREÇÃO: Usar valores REAIS de água (water_f) para normalização, não modulados (water_vis)
+    # Isso garante que diferentes chuvas produzam diferentes visualizações
+    positive = np.isfinite(water_f) & (water_f > 0.0)
+    # Use GLOBAL fixed scales to preserve difference between rainfall amounts
+    global_vmin = 0.001  # 1mm threshold
+    global_vmax = 0.50   # 500mm reference scale
+    vmin_eff = float(max(global_vmin, threshold_m))
+    vmax_eff = float(global_vmax)
     if transform is None or crs is None:
         transform, crs = _default_georef_for_array(water_f)
-
-    if np.any(positive):
-        max_pos = float(np.nanmax(water_vis[positive]))
-        p99 = float(np.nanpercentile(water_vis[positive], 99.0))
-        p997 = float(np.nanpercentile(water_vis[positive], 99.7))
-        # Escala robusta para aumentar contraste visual de acúmulo sem estourar por outliers
-        vmax = min(max_pos, max(p99, p997 * 1.03))
-    else:
-        vmax = float(np.nanmax(water_f)) if np.isfinite(water_f).any() else vmin_eff + 1e-3
-    vmax_eff = max(vmin_eff + 1e-6, vmax)
 
     # Gradiente calibrado para o estilo do lami.png (azul claro -> azul escuro)
     water_cmap = mcolors.LinearSegmentedColormap.from_list(
@@ -2383,32 +2650,38 @@ def _save_water_rgba_geotiff(water: np.ndarray, transform=None, crs=None, thresh
     water_cmap.set_under((0, 0, 0, 0.0))
     water_cmap.set_bad((0, 0, 0, 0.0))
 
-    # Limiar visual adaptativo para evitar "tela azul" quando há lâmina rasa em todo domínio
+    # Limiar visual adaptativo - baseado em valores REAIS (water_f), não modulados
     if np.any(positive):
-        p30 = float(np.nanpercentile(water_vis[positive], 30.0))
-        p85 = float(np.nanpercentile(water_vis[positive], 85.0))
+        p30 = float(np.nanpercentile(water_f[positive], 30.0))
+        p85 = float(np.nanpercentile(water_f[positive], 85.0))
         vis_threshold = max(vmin_eff, p30)
         # Evita imagem em branco quando a distribuição é muito estreita
         if (p85 - p30) < 1e-4:
             vis_threshold = vmin_eff
         else:
-            above_vis = int(np.count_nonzero(np.isfinite(water_vis) & (water_vis > vis_threshold)))
+            above_vis = int(np.count_nonzero(np.isfinite(water_f) & (water_f > vis_threshold)))
             if above_vis < max(20, int(0.0015 * water_f.size)):
                 vis_threshold = vmin_eff
     else:
         vis_threshold = vmin_eff
 
-    # Curva para realçar contraste sem pintar tudo igualmente
+    # Curva para realçar contraste - normalização baseada em valores reais
     norm = mcolors.PowerNorm(gamma=0.95, vmin=vis_threshold, vmax=vmax_eff, clip=True)
-    masked = np.ma.masked_less_equal(water_vis, vis_threshold)
-    rgba_f = np.clip(water_cmap(norm(masked)), 0.0, 1.0)
-
-    # Alpha seletivo: lâmina muito rasa quase transparente; acúmulo fica forte
-    depth_norm = np.clip((water_vis - vis_threshold) / (vmax_eff - vis_threshold + 1e-6), 0.0, 1.0)
+    
+    # Aplicar colormap a TODOS os valores (vai interpolar gradiente)
+    normalized_vals = norm(water_f)
+    rgba_f = water_cmap(normalized_vals)  # Aplica colormap com interpolação
+    rgba_f = np.clip(rgba_f, 0.0, 1.0)
+    
+    # Alpha seletivo: raso quase transparente; profundo opaco
+    depth_norm = np.clip((water_f - vis_threshold) / (vmax_eff - vis_threshold + 1e-6), 0.0, 1.0)
     alpha = np.zeros_like(water_f, dtype=np.float32)
-    wet = np.isfinite(water_vis) & (water_vis > vis_threshold)
+    wet = np.isfinite(water_f) & (water_f > vis_threshold)
     alpha_curve = np.clip((depth_norm - 0.10) / 0.90, 0.0, 1.0)
     alpha[wet] = 0.10 + 0.64 * (alpha_curve[wet] ** 1.20)
+    
+    # Zeros onde não tem água
+    alpha[~wet] = 0.0
     rgba_f[..., 3] = alpha
 
     rgba = (rgba_f * 255).astype(np.uint8)
@@ -2484,14 +2757,17 @@ def _water_over_terrain_geotiff_bytes(dem: np.ndarray, water: np.ndarray, transf
 
     positive = np.isfinite(water_f) & (water_f > 0.0) & valid_dem
     if np.any(positive):
-        vmin_eff = max(1e-6, float(threshold_m))
-        p25 = float(np.nanpercentile(water_f[positive], 25.0))
-        vvis = max(vmin_eff, p25)
-        p995 = float(np.nanpercentile(water_f[positive], 99.5))
-        vmax_eff = max(vvis + 1e-6, p995)
+        max_pos = float(np.nanmax(water_f[positive]))
     else:
-        vvis = max(1e-6, float(threshold_m))
-        vmax_eff = vvis + 1e-3
+        max_pos = 0.0
+    
+    # CORREÇÃO: Usar escala GLOBAL fixa, não normalizada por simulação
+    # Permite comparar visualmente simulações diferentes
+    global_vmin = 0.001  # 1mm de threshold
+    global_vmax = 0.50   # Escala máxima de referência (500mm de chuva)
+    
+    vvis = global_vmin
+    vmax_eff = max(max_pos, global_vmax)  # Respeita valores maiores que max se ocorrerem
 
     wet = np.isfinite(water_f) & (water_f > vvis) & valid_dem
     water_cmap = mcolors.LinearSegmentedColormap.from_list(
@@ -2506,16 +2782,20 @@ def _water_over_terrain_geotiff_bytes(dem: np.ndarray, water: np.ndarray, transf
         ],
         N=256,
     )
-    water_rgb = np.array(water_cmap(PowerNorm(gamma=0.92, vmin=vvis, vmax=vmax_eff, clip=True)(np.clip(water_f, vvis, vmax_eff))), dtype=np.float32)[..., :3]
+    
+    # Renderizar água com cores azuis do colormap
+    norm = PowerNorm(gamma=0.92, vmin=vvis, vmax=vmax_eff, clip=True)
+    normalized_water = norm(water_f)  # valores 0-1
+    rgba_water = water_cmap(normalized_water)  # aplica colormap = RGBA
+    water_rgb = np.array(rgba_water)[..., :3]  # pega só RGB (azul claro -> azul escuro)
 
     depth_norm = np.zeros_like(water_f, dtype=np.float32)
     if np.any(wet):
         depth_norm[wet] = np.clip((water_f[wet] - vvis) / (vmax_eff - vvis + 1e-6), 0.0, 1.0)
-    alpha = np.zeros_like(water_f, dtype=np.float32)
-    alpha[wet] = 0.18 + 0.72 * (depth_norm[wet] ** 0.88)
-
-    out_rgb = terrain[..., :3].copy()
-    out_rgb[wet] = np.clip((1.0 - alpha[wet, None]) * terrain[..., :3][wet] + alpha[wet, None] * water_rgb[wet], 0.0, 1.0)
+    
+    # Mostrar APENAS a água (colormap azul), NÃO o terreno
+    # Isso vai sair: sem água = branco/claro, com água = azul variado
+    out_rgb = water_rgb.copy()
 
     data = (out_rgb * 255.0).astype(np.uint8)
     data = np.transpose(data, (2, 0, 1))
@@ -2582,29 +2862,20 @@ def _water_rgba_geotiff_bytes(water: np.ndarray, transform=None, crs=None, vmin:
         except Exception:
             pass
 
-    positive = np.isfinite(water_vis) & (water_vis > 0.0)
-    if np.any(positive):
-        max_pos = float(np.nanmax(water_vis[positive]))
-    else:
-        max_pos = 0.0
-    
+    # CORREÇÃO: Usar valores REAIS de água (water_f) para normalização, não modulados (water_vis)
+    positive = np.isfinite(water_f) & (water_f > 0.0)
     if transform is None or crs is None:
         transform, crs = _default_georef_for_array(water_f)
 
     # vmin efetivo com fallback para não zerar tudo quando o campo é muito raso
     vmin_eff = max(1e-6, float(vmin), float(threshold_m))
-    if max_pos > 0.0 and max_pos <= vmin_eff:
-        vmin_eff = max(1e-6, 0.5 * max_pos)
 
-    # Calcular vmax se não fornecido
+    # Calcular vmax se não fornecido - usar GLOBAL fixed scales
     if vmax is None:
-        if np.any(positive):
-            p99 = float(np.nanpercentile(water_vis[positive], 99.0))
-            p997 = float(np.nanpercentile(water_vis[positive], 99.7))
-            vmax = min(max_pos, max(p99, p997 * 1.03))
-        else:
-            vmax = vmin_eff + 1e-3
-    vmax_eff = max(vmin_eff + 1e-6, float(vmax))
+        # Use GLOBAL fixed scales to preserve difference between rainfall amounts
+        vmax_eff = 0.50  # 500mm reference scale
+    else:
+        vmax_eff = max(vmin_eff + 1e-6, float(vmax))
 
     # Colormap padrão no estilo do lami.png (se não informado)
     if cmap is None:
@@ -2626,28 +2897,36 @@ def _water_rgba_geotiff_bytes(water: np.ndarray, transform=None, crs=None, vmin:
     cmap.set_under((0, 0, 0, 0.0))
     cmap.set_bad((0, 0, 0, 0.0))
 
+    # Limiar visual adaptativo - baseado em valores REAIS (water_f), não modulados
     if np.any(positive):
-        p30 = float(np.nanpercentile(water_vis[positive], 30.0))
-        p85 = float(np.nanpercentile(water_vis[positive], 85.0))
+        p30 = float(np.nanpercentile(water_f[positive], 30.0))
+        p85 = float(np.nanpercentile(water_f[positive], 85.0))
         vis_threshold = max(vmin_eff, p30)
         if (p85 - p30) < 1e-4:
             vis_threshold = vmin_eff
         else:
-            above_vis = int(np.count_nonzero(np.isfinite(water_vis) & (water_vis > vis_threshold)))
+            above_vis = int(np.count_nonzero(np.isfinite(water_f) & (water_f > vis_threshold)))
             if above_vis < max(20, int(0.0015 * water_f.size)):
                 vis_threshold = vmin_eff
     else:
         vis_threshold = vmin_eff
 
     norm = mcolors.PowerNorm(gamma=0.95, vmin=vis_threshold, vmax=vmax_eff, clip=True)
-    masked = np.ma.masked_less_equal(water_vis, vis_threshold)
-    rgba_f = np.clip(cmap(norm(masked)), 0.0, 1.0)
-
-    depth_norm = np.clip((water_vis - vis_threshold) / (vmax_eff - vis_threshold + 1e-6), 0.0, 1.0)
+    
+    # Aplicar colormap a TODOS os valores (vai interpolar gradiente)
+    normalized_vals = norm(water_f)
+    rgba_f = cmap(normalized_vals)  # Aplica colormap com interpolação
+    rgba_f = np.clip(rgba_f, 0.0, 1.0)
+    
+    # Alpha seletivo: raso quase transparente; profundo opaco
+    depth_norm = np.clip((water_f - vis_threshold) / (vmax_eff - vis_threshold + 1e-6), 0.0, 1.0)
     alpha = np.zeros_like(water_f, dtype=np.float32)
-    wet = np.isfinite(water_vis) & (water_vis > vis_threshold)
+    wet = np.isfinite(water_f) & (water_f > vis_threshold)
     alpha_curve = np.clip((depth_norm - 0.10) / 0.90, 0.0, 1.0)
     alpha[wet] = 0.10 + 0.64 * (alpha_curve[wet] ** 1.20)
+    
+    # Zeros onde não tem água
+    alpha[~wet] = 0.0
     rgba_f[..., 3] = alpha
 
     rgba = (rgba_f * 255).astype(np.uint8)
@@ -3019,6 +3298,78 @@ def _calculate_flow_accumulation(flow_direction: np.ndarray, dem: np.ndarray) ->
 
     return acc
 
+def _calculate_flow_accumulation_water_weighted(
+    flow_direction: np.ndarray,
+    dem: np.ndarray,
+    water_height: np.ndarray
+) -> np.ndarray:
+    """
+    Compute D8 flow accumulation weighted by water depth.
+    
+    Simple approach: Calculate standard D8 accumulation, then weight by water depth.
+    This avoids numerical explosion while maintaining variation between scenarios.
+    
+    Args:
+        flow_direction: D8 flow direction (1-8) array
+        dem: Digital elevation model
+        water_height: Water depth at each location (from simulation)
+    
+    Returns:
+        Weighted accumulation where higher water = higher values in downstream cells
+    """
+    logger.info("Calculating water-weighted flow accumulation...")
+    
+    height, width = flow_direction.shape
+    
+    # First, calculate standard D8 accumulation (this is stable and proven)
+    acc_standard = np.ones((height, width), dtype=np.float32)
+    
+    # D8 offsets
+    offsets = {
+        1: (-1, 1),   # NE
+        2: (-1, 0),   # N
+        3: (-1, -1),  # NW
+        4: (0, -1),   # W
+        5: (1, -1),   # SW
+        6: (1, 0),    # S
+        7: (1, 1),    # SE
+        8: (0, 1),    # E
+    }
+    
+    # Process cells from high to low elevation to accumulate downstream
+    flat_idx = np.argsort(dem.ravel())[::-1]
+    for idx in flat_idx:
+        i = int(idx // width)
+        j = int(idx % width)
+        d = int(flow_direction[i, j])
+        if d == 0:
+            continue
+        di, dj = offsets.get(d, (0, 0))
+        ni, nj = i + di, j + dj
+        if 0 <= ni < height and 0 <= nj < width:
+            acc_standard[ni, nj] += acc_standard[i, j]
+    
+    # Now weight the accumulation by water depth
+    # Water weight: add to base contribution based on local water depth
+    # Normalized by 1 meter reference depth
+    # Use stronger multiplier to show clear differences between rain scenarios
+    water_factor = 1.0 + 3.0 * np.clip(water_height / 1.0, 0.0, 1.0)
+    
+    # Apply multiplicative weight (ranges from 1.0x to 4.0x)
+    acc_weighted = acc_standard * water_factor
+    
+    # Normalize to 1-10 scale (standard hydrological intensity scale)
+    # This is more intuitive and widely used in flood risk mapping
+    acc_min = np.nanmin(acc_weighted)
+    acc_max = np.nanmax(acc_weighted)
+    if acc_max > acc_min:
+        acc_normalized = (acc_weighted - acc_min) / (acc_max - acc_min + 1e-6)
+    else:
+        acc_normalized = np.zeros_like(acc_weighted)
+    acc_weighted = 1.0 + acc_normalized * 9.0  # Scale to 1-10
+    
+    return acc_weighted
+
 def _save_flow_direction(flow_direction, transform=None, crs=None):
     """Save flow direction as GeoTIFF."""
     flow_path = Path("outputs/test_run/flow_direction.tif")
@@ -3043,9 +3394,9 @@ def _save_flow_direction(flow_direction, transform=None, crs=None):
     return flow_path
 
 
-def _save_flow_accumulation(flow_acc: np.ndarray, transform=None, crs=None):
+def _save_flow_accumulation(flow_acc: np.ndarray, transform=None, crs=None, filename="flow_accumulation.tif"):
     """Save flow accumulation as GeoTIFF."""
-    acc_path = Path("outputs/test_run/flow_accumulation.tif")
+    acc_path = Path(f"outputs/test_run/{filename}")
     height, width = flow_acc.shape
     if transform is None or crs is None:
         transform, crs = _default_georef_for_array(flow_acc.astype(np.float32, copy=False))
@@ -3282,7 +3633,7 @@ def get_inundacao_gpkg_image():
             edgecolor=(0.07, 0.24, 0.55, 0.95),
             linewidth=0.7,
         )
-        ax.set_title('Inundação (camada vetorial GPKG)', fontsize=13, fontweight='bold')
+        ax.set_title('Flood Extent (GPKG vector)', fontsize=13, fontweight='bold')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.grid(alpha=0.15, linestyle='--')
@@ -3307,7 +3658,7 @@ def download_flow():
 
 @app.route('/download/fluxo-preferencial-d8')
 def download_fluxo_preferencial_d8():
-    """Download do raster de direção de fluxo preferencial (D8)."""
+    """Download preferential flow direction raster (D8)."""
     flow_path = Path("outputs/test_run/flow_direction.tif")
     if flow_path.exists():
         return send_file(flow_path, as_attachment=True, download_name='fluxo_preferencial_d8.tif')
@@ -3498,8 +3849,8 @@ def get_flow_direction_image():
                 minlength=0.0,
                 zorder=5,
             )
-            cbar = plt.colorbar(q, ax=ax, fraction=0.042, pad=0.02)
-            cbar.set_label('Intensidade do fluxo preferencial (normalizada)')
+            cbar = plt.colorbar(q, ax=ax, fraction=0.042, pad=0.02)  # type: ignore
+            cbar.set_label('Preferential flow intensity (normalized)')
         else:
             ax.quiver(
                 xx[valid], yy[valid], u[valid], v[valid],
@@ -3601,7 +3952,7 @@ def get_flow_direction_image():
         ax.text(
             0.015,
             0.02,
-            'Setas/linhas D8 guiadas pela declividade do terreno (DEM)',
+            'D8 arrows/lines guided by terrain slope (DEM)',
             transform=ax.transAxes,
             fontsize=9,
             color=(0.08, 0.18, 0.35, 0.95),
@@ -3614,7 +3965,7 @@ def get_flow_direction_image():
         ax.set_ylim(h - 1, 0)
         ax.set_aspect('equal', adjustable='box')
 
-        ax.set_title('Fluxo Preferencial (D8) - Visualização Limpa', fontsize=14, fontweight='bold')
+        ax.set_title('Preferential Flow (D8) - Clean Visualization', fontsize=14, fontweight='bold')
         ax.set_xlabel('X (pixels)')
         ax.set_ylabel('Y (pixels)')
         ax.grid(False)
@@ -3666,21 +4017,21 @@ def get_flow_accumulation_image():
                 zorder=3,
             )
 
-        ax.set_title('Acumulação de Fluxo (log1p)', fontsize=14, fontweight='bold')
+        ax.set_title('Flow Accumulation (log scale)', fontsize=14, fontweight='bold')
         ax.set_xlabel('X (pixels)')
         ax.set_ylabel('Y (pixels)')
-        plt.colorbar(im, ax=ax, label='Acumulação normalizada (log1p)')
+        plt.colorbar(im, ax=ax, label='Normalized accumulation (log scale)')  # type: ignore
         ax.legend(
             handles=[
-                Patch(facecolor=cmap_acc(0.25), edgecolor='none', label='Low accumulation (Baixa acumulação)'),
-                Patch(facecolor=cmap_acc(0.55), edgecolor='none', label='Medium accumulation (Média acumulação)'),
-                Patch(facecolor=cmap_acc(0.90), edgecolor='none', label='High accumulation (Alta acumulação)'),
-                Patch(facecolor=cm.get_cmap('winter')(0.75), edgecolor='none', label='Main drainage network (Rede principal)'),
+                Patch(facecolor=cmap_acc(0.25), edgecolor='none', label='Low accumulation'),
+                Patch(facecolor=cmap_acc(0.55), edgecolor='none', label='Medium accumulation'),
+                Patch(facecolor=cmap_acc(0.90), edgecolor='none', label='High accumulation'),
+                Patch(facecolor=cm.get_cmap('winter')(0.75), edgecolor='none', label='Main drainage network'),
             ],
             loc='lower right',
             fontsize=8,
             framealpha=0.92,
-            title='Drainage legend (Legenda)',
+            title='Drainage Legend',
             title_fontsize=8,
         )
 
@@ -3698,42 +4049,105 @@ def get_flow_accumulation_image():
 
 @app.route('/image/water-peak')
 def get_water_peak_image():
-    """Get peak/final water depth heatmap as PNG for dashboard panel."""
+    """Get peak/final water depth heatmap with enhanced visualization and proper scaling."""
     import matplotlib.pyplot as plt
     import matplotlib.cm as cm
+    from matplotlib.colors import Normalize, LogNorm
+    from matplotlib.patches import Rectangle
 
     water_path = Path("outputs/test_run/water_depth.tif")
     if not water_path.exists():
         return "Water depth not found", 404
 
-    with rasterio.open(water_path) as src:
-        water = src.read(1).astype(np.float32, copy=False)
-
-    valid = np.isfinite(water) & (water > 0.0)
-    fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
-
-    if np.any(valid):
-        p1, p995 = np.nanpercentile(water[valid], (1, 99.5))
-        wnorm = np.clip((water - p1) / (p995 - p1 + 1e-6), 0.0, 1.0)
-        wmask = np.ma.masked_where(~valid, wnorm)
-        im = ax.imshow(wmask, cmap=cm.get_cmap('turbo'), vmin=0.0, vmax=1.0)
-    else:
-        im = ax.imshow(np.zeros_like(water, dtype=np.float32), cmap=cm.get_cmap('turbo'), vmin=0.0, vmax=1.0)
-
-    ax.set_title('Lâmina de Água - Intensidade (Pico/Final)', fontsize=14, fontweight='bold')
-    ax.set_xlabel('X (pixels)')
-    ax.set_ylabel('Y (pixels)')
-    plt.colorbar(im, ax=ax, label='Intensidade relativa da lâmina')
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-    buf.seek(0)
-    plt.close(fig)
-    resp = send_file(buf, mimetype='image/png')
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
+    try:
+        with rasterio.open(water_path) as src:
+            water = src.read(1).astype(np.float64, copy=False)
+        
+        # Filter out NaN and invalid values
+        valid = np.isfinite(water)
+        h, w = water.shape
+        
+        # Create figure with high resolution
+        fig = plt.figure(figsize=(12, 10), dpi=120, facecolor='white')
+        ax = fig.add_subplot(111)
+        
+        if np.any(valid):
+            water_valid = water[valid]
+            min_depth = np.nanmin(water_valid)
+            max_depth = np.nanmax(water_valid)
+            mean_depth = np.nanmean(water_valid)
+            
+            # Create masked array (only show valid cells with water > 0)
+            water_masked = np.ma.masked_array(water, mask=~valid | (water <= 0))
+            
+            # CORREÇÃO: Usar escala GLOBAL fixa, não normalizada por simulação
+            # Permite comparar visualmente simulações diferentes
+            # Assume que max_depth esperado é ~0.5m (500mm de chuva)
+            global_vmax = 0.50  # Escala máxima de referência
+            global_vmin = 0.001  # 1mm de threshold
+            
+            # Aderir à escala global mesmo que haja valores maiores (raro)
+            norm = Normalize(vmin=global_vmin, vmax=max(max_depth, global_vmax))
+            
+            # Use high-contrast colormap (better than RdYlBu for water)
+            # Para 50mm: cor mais clara; para 500mm: cor mais escura
+            cmap = cm.get_cmap('Blues')
+            
+            # Display with interpolation for smoothness
+            im = ax.imshow(water_masked, cmap=cmap, norm=norm, interpolation='bilinear', origin='upper')
+            
+            # Enhanced colorbar
+            cbar = plt.colorbar(im, ax=ax, label='Water Depth (m)', pad=0.02, shrink=0.9)  # type: ignore
+            cbar.set_label('Water Depth (m)', fontsize=12, fontweight='bold')
+            cbar.ax.tick_params(labelsize=10)
+            
+            # Add statistics text box
+            stats_text = f'Min: {min_depth:.3f}m | Max: {max_depth:.3f}m | Mean: {mean_depth:.3f}m\nValid cells: {valid.sum()}/{valid.size}'
+            ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=9,
+                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        else:
+            # No valid data - show empty grid
+            ax.imshow(np.zeros((h, w)), cmap='Blues', vmin=0, vmax=1)
+            ax.text(0.5, 0.5, 'No water depth data available', 
+                   ha='center', va='center', transform=ax.transAxes,
+                   fontsize=14, fontweight='bold', color='red')
+        
+        # Title and labels
+        ax.set_title('Peak Water Depth Map (Maximum Inundation Intensity)', 
+                    fontsize=14, fontweight='bold', pad=15)
+        ax.set_xlabel('X (pixels)', fontsize=11, fontweight='bold')
+        ax.set_ylabel('Y (pixels)', fontsize=11, fontweight='bold')
+        
+        # Grid for reference
+        ax.grid(True, alpha=0.15, linestyle='--', linewidth=0.5, color='black')
+        ax.set_facecolor('#eeeeee')
+        
+        # Set proper axis limits
+        ax.set_xlim(0, w - 1)
+        ax.set_ylim(h - 1, 0)
+        ax.set_aspect('equal', adjustable='box')
+        
+        # Save figure
+        buf = BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format='png', dpi=120, bbox_inches='tight', facecolor='white', 
+                   edgecolor='none', pad_inches=0.3)
+        buf.seek(0)
+        plt.close(fig)
+        
+        # Return with no-cache headers
+        resp = send_file(buf, mimetype='image/png')
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+        
+    except Exception as e:
+        logger.error(f"Error generating peak water depth image: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error: {str(e)}", 500
 
 
 @app.route('/image/orthomosaic')
@@ -3743,6 +4157,65 @@ def get_orthomosaic_image():
     if png_path.exists():
         return send_file(png_path, mimetype='image/png', max_age=0)
     return "Orthomosaic not found", 404
+
+
+@app.route('/image/ml-validation')
+def get_ml_validation_image():
+    """Serve ML validation results (metrics + feature importance) as PNG."""
+    png_path = Path("outputs/ml_validation/feature_importance_roc.png")
+    if png_path.exists():
+        return send_file(png_path, mimetype='image/png', max_age=0)
+    return "ML validation not found", 404
+
+
+@app.route('/image/flood-probability')
+def get_flood_probability_image():
+    """Serve flood probability map as PNG heatmap."""
+    tif_path = Path("outputs/ml_validation/flood_probability.tif")
+    if not tif_path.exists():
+        return "Flood probability map not found", 404
+    
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+    
+    with rasterio.open(tif_path) as src:
+        prob = src.read(1).astype(np.float32, copy=False)
+    
+    valid = np.isfinite(prob)
+    fig, ax = plt.subplots(figsize=(10, 9), dpi=100, facecolor='white')
+    
+    if np.any(valid):
+        pmask = np.ma.masked_where(~valid, prob)
+        im = ax.imshow(pmask, cmap=cm.get_cmap('RdYlGn_r'), vmin=0.0, vmax=1.0, interpolation='bilinear')
+    else:
+        im = ax.imshow(np.zeros_like(prob), cmap=cm.get_cmap('RdYlGn_r'), vmin=0.0, vmax=1.0)
+    
+    ax.set_title('ML-Predicted Flood Susceptibility', fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel('X (pixels)', fontsize=11)
+    ax.set_ylabel('Y (pixels)', fontsize=11)
+    cbar = plt.colorbar(im, ax=ax, label='Probability (0-1)', shrink=0.8)  # type: ignore
+    cbar.set_label('Inundation Probability', fontsize=11)
+    ax.grid(True, alpha=0.2, linestyle='--')
+    ax.set_facecolor('#f0f0f0')
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', facecolor='white')
+    buf.seek(0)
+    plt.close(fig)
+    resp = send_file(buf, mimetype='image/png')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return resp
+
+
+@app.route('/api/ml-metrics')
+def get_ml_metrics():
+    """Serve ML validation metrics as JSON."""
+    metrics_path = Path("outputs/ml_validation/ml_metrics_improved.json")
+    if metrics_path.exists():
+        with open(metrics_path, 'r') as f:
+            metrics = json.load(f)
+        return jsonify(metrics)
+    return jsonify({"error": "ML metrics not found"}), 404
 
 
 @app.route('/download/orthomosaic')
@@ -3771,6 +4244,37 @@ def download_all():
     except Exception as e:
         logger.error(f"ZIP error: {e}")
         return "Error creating ZIP", 500
+
+
+@app.route('/download/flood-probability')
+def download_flood_probability():
+    """Download ML-predicted flood probability as GeoTIFF."""
+    tif_path = Path("outputs/ml_validation/flood_probability.tif")
+    if tif_path.exists():
+        return send_file(tif_path, as_attachment=True, download_name='flood_susceptibility_probability.tif')
+    return "File not found", 404
+
+
+@app.route('/download/ml-validation-zip')
+def download_ml_validation():
+    """Download all ML validation results as ZIP."""
+    try:
+        ml_dir = Path("outputs/ml_validation")
+        Path("outputs").mkdir(parents=True, exist_ok=True)
+        ml_zip_path = Path("outputs/ml_validation_results.zip")
+        
+        if not ml_dir.exists():
+            return "ML validation results not available", 404
+        
+        with zipfile.ZipFile(ml_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for file in ml_dir.glob('*'):
+                if file.is_file() and file.name not in ['ml_validation_results.zip']:
+                    zf.write(file, arcname=f"ml_validation/{file.name}")
+        
+        return send_file(ml_zip_path, as_attachment=True, download_name='ml_validation_results.zip')
+    except Exception as e:
+        logger.error(f"ML ZIP error: {e}")
+        return "Error creating ML validation ZIP", 500
 
 
 # ===========================
