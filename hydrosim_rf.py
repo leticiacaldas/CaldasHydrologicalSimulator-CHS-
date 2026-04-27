@@ -169,7 +169,7 @@ class DiffusionWaveFloodModel:
             self.active_cells_coords = set(zip(ys.tolist(), xs.tolist()))
             return
 
-        # Caso não seja uniforme: aplicar nas fontes; se não houver fontes, usar rio como fallback; se ainda assim não houver, aplicar uniforme para evitar simulação "em branco"
+        # If not uniform: apply at sources; if no sources, use river as fallback; if still none, apply uniform to avoid "blank" simulation
         if np.any(self.is_source):
             self.water_height[self.is_source] += water_to_add_meters
             ys, xs = np.where(self.is_source)
@@ -179,7 +179,7 @@ class DiffusionWaveFloodModel:
             ys, xs = np.where(self.river_mask)
             self.active_cells_coords.update(zip(ys, xs))
         else:
-            # Fallback: sem fontes nem rio definidos, distribuir uniformemente
+            # Fallback: no sources or river defined, distribute uniformly
             self.water_height += water_to_add_meters
             ys, xs = np.where(self.water_height > 0)
             self.active_cells_coords.update(zip(ys, xs))
@@ -386,7 +386,7 @@ def _init_animation_figure(dem_data: np.ndarray, transform, crs, background_rgb:
     fig, ax = plt.subplots(figsize=(10, 8))
     bounds = array_bounds(dem_data.shape[0], dem_data.shape[1], transform)
 
-    # Fixar limites antes de adicionar tiles (necessário para o mapa base cobrir toda a área)
+    # Set limits before adding tiles (necessary for basemap to cover entire area)
     x_min, y_min, x_max, y_max = bounds
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
@@ -404,7 +404,7 @@ def _init_animation_figure(dem_data: np.ndarray, transform, crs, background_rgb:
                                 zorder=0, reset_extent=False)
             except TypeError:
                 ctx.add_basemap(ax, crs=crs, source=src, zorder=0)
-            # Refixar limites por segurança
+            # Reset limits for safety
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
 
@@ -584,7 +584,7 @@ def _identify_intervention_zones(dem: np.ndarray, flood_prob: np.ndarray, river_
         # entre DEMs de diferentes resoluções. min_slope=0.05 → apenas 5% dos declives mais suaves
         gentle_slope = slope_norm < float(min_slope)
         forest_candidates = high_flood_risk & gentle_slope
-        # Fallback: se nenhuma área for encontrada, relaxar threshold de declividade
+        # Fallback: if no area found, relax slope threshold
         if not np.any(forest_candidates) and np.any(high_flood_risk):
             gentle_slope = slope_norm < min(0.5, float(min_slope) * 5)
             forest_candidates = high_flood_risk & gentle_slope
@@ -1633,13 +1633,13 @@ def _plot_temporal_diagnostics(model):
 
 
 def _render_simulation_outputs(model, _tmp_dir, anim_path, anim_format, total_rain, cell_size, sources_mask):
-    """Processa resultados e gera downloads"""
+    """Process results and generate downloads"""
 
     st.markdown("---")
     st.subheader("Simulation Results")
 
-    # 1. Estatísticas finais
-    # Se não houver fontes definidas (ou a simulação usou chuva uniforme), considere chuva sobre toda a área
+    # 1. Final statistics
+    # If no sources are defined (or the simulation used uniform rainfall), consider rainfall over the entire area
     if np.any(sources_mask):
         rain_area_cells = np.sum(sources_mask > 0)
     else:
@@ -2490,7 +2490,7 @@ def main():
                 vector_path = None
                 river_path = None
 
-                # Processar DEM e vetores de fonte
+                # Process DEM and source vectors
                 if vector_files:
                     dem_path, vector_path, tmp = _save_input_files(
                         dem_file, vector_files)
@@ -2504,7 +2504,7 @@ def main():
                     with open(dem_path, "wb") as f:
                         f.write(dem_file.getbuffer())
 
-                # Processar vetor de rio se enviado
+                # Process river vector if sent
                 if river_vector_files:
                     for f in river_vector_files:
                         if f.name.lower().endswith((".gpkg", ".shp")):
@@ -2532,10 +2532,10 @@ def main():
                 )
                 model.uniform_rain = (rain_mode == "Uniforme na área")
 
-                # Fallback: se usuário escolheu "Somente nas fontes", mas não há fontes nem rio, aplicar chuva uniforme para evitar resultado em branco
+                # Fallback: if user chose "Only in sources", but there are no sources or river, apply uniform rainfall to avoid blank result
                 if (rain_mode != "Uniforme na área") and (not np.any(sources_mask)) and (not np.any(river_mask)):
                     st.info(
-                        "Nenhuma fonte vetorial ou rio definidos. Aplicando chuva uniforme na área para evitar resultado vazio.")
+                        "No source vectors or river defined. Applying uniform rainfall to the area to avoid empty results.")
                     model.uniform_rain = True
 
                 # Preparar fundo visual
