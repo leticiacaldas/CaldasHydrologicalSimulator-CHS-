@@ -1,10 +1,10 @@
 """
-Funções utilitárias para preparação de dados geoespaciais para simulação HydroSim.
+Utility functions para data preparation geospatial para simulação HydroSim.
 
 Inclui:
 - Carregamento e reamostragem de DEM
-- Rasterização de vetores (fontes, rios, intensidade)
-- Preparação de fundos/ortomosaicos
+- Vector rasterization (sources, rivers, intensity)
+- Preparation of backgrounds/orthomosaics
 - Reprojection e resampling de rasters
 
 Author: Letícia Caldas
@@ -169,27 +169,27 @@ def _setup_geodata(
     river_path: Optional[str] = None,
     attribute_name: Optional[str] = None,
 ) -> Tuple[np.ndarray, np.ndarray, Any, Any, float, np.ndarray, Optional[np.ndarray]]:
-    """Carrega DEM e rasteriza fontes e rio opcionalmente.
+    """Carrega DEM e rasteriza sources e rio opcionalmente.
 
     Parameters
     ----------
     dem_path : str
         Caminho do arquivo DEM
     vector_path : str or None
-        Caminho do arquivo de fontes (vetor)
+        Caminho do arquivo de sources (vetor)
     grid_reduction_factor : int
         Fator de redução de grade (subsampling)
     river_path : str, optional
-        Caminho do arquivo de rios (vetor)
+        Caminho do arquivo de rivers (vetor)
     attribute_name : str, optional
-        Nome de atributo para intensidade espacial
+        Nome de atributo para intensity espacial
 
     Returns
     -------
     dem_data : np.ndarray
         Matriz de elevação reamostrada
     sources_mask : np.ndarray
-        Máscara binária de fontes
+        Máscara binária de sources
     transform : Affine
         Transform do raster
     crs : CRS
@@ -197,9 +197,9 @@ def _setup_geodata(
     cell_size : float
         Tamanho da célula em metros
     river_mask : np.ndarray
-        Máscara binária de rios
+        Máscara binária de rivers
     sources_intensity : np.ndarray or None
-        Mapa de intensidade espacial se attribute_name fornecido
+        Mapa de intensity espacial se attribute_name fornecido
     """
     with rio.open(dem_path) as dem_src:
         dem = dem_src.read(1)
@@ -236,7 +236,7 @@ def _setup_geodata(
     except Exception:
         cell_size = 1.0
 
-    # Rasterizar fontes (vetor)
+    # Rasterizar sources (vetor)
     sources_mask = np.zeros_like(dem_data, dtype=np.uint8)
     sources_intensity = None
 
@@ -249,7 +249,7 @@ def _setup_geodata(
                 gdf = gdf.to_crs(crs)
 
             if attribute_name and (attribute_name in gdf.columns):
-                # Rasterizar intensidade
+                # Rasterizar intensity
                 sources_intensity = rasterize(
                     [
                         (geom, float(val) if np.isfinite(val) else 0.0)

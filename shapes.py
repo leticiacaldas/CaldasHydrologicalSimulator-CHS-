@@ -1,7 +1,7 @@
 """
 HydroSim-RF Custom Styles Module
 
-Este módulo fornece estilos CSS customizados para a interface Streamlit
+This module fornece CSS styles customized para a interface Streamlit
 e funções de layout para a aplicação HydroSim-RF.
 
 Author: Letícia Caldas
@@ -14,7 +14,7 @@ import streamlit as st
 
 def apply_custom_styles():
     """
-    Aplica estilos CSS customizados à interface Streamlit.
+    Aplica CSS styles customized à interface Streamlit.
     
     Inclui:
     - Cartões personalizados (custom-card)

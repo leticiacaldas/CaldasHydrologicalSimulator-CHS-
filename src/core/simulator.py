@@ -381,8 +381,8 @@ class NumpyDiffusionWaveEngine(DiffusionWaveFloodModel):
     """
     Compat layer com a API local esperada no app.
 
-    Mantém o mesmo motor numérico de `DiffusionWaveFloodModel`, apenas
-    expondo nomes de métodos equivalentes:
+    Keeps o same engine numeric de `DiffusionWaveFloodModel`, apenas
+    exposing names of equivalent methods:
     - `add_water()` -> `apply_rainfall()`
     - `run_flow_step()` -> `advance_flow()`
     - `update_stats()` -> `record_diagnostics()`
@@ -398,7 +398,7 @@ class NumpyDiffusionWaveEngine(DiffusionWaveFloodModel):
         self.record_diagnostics(time_step_minutes)
 
 
-# Alias: usar a versão D8 melhorada como padrão
+# Alias: usar a improved D8 version como padrão
 GamaFloodModelNumpy = GamaFloodModelD8
 
 # Manter referência à versão legacy de difusão-onda para compatibilidade

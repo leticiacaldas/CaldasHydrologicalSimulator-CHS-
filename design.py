@@ -1,7 +1,7 @@
 """
 design.py - Componentes de Design Moderno para HydroSim-RF
 
-Módulo que fornece componentes visuais customizados, estatísticas
+Module that fornece components visuais customized, estatísticas
 e layouts responsivos para a interface do simulador de inundações.
 
 Author: Letícia Caldas
@@ -410,7 +410,7 @@ def apply_modern_theme():
 
 def create_header(
     title: str = "HydroSim-RF",
-    subtitle: str = "Simulador Híbrido de Inundações",
+    subtitle: str = "Hybrid Simulator de Floods",
     logo_main_path: Optional[str] = None,
     logo_secondary_path: Optional[str] = None,
 ):
@@ -666,7 +666,7 @@ if __name__ == "__main__":
     apply_modern_theme()
     create_header(
         title="HydroSim-RF",
-        subtitle="Simulador Híbrido de Inundações Urbanas"
+        subtitle="Hybrid Simulator de Floods Urbanas"
     )
     
     st.write("## Example de Cards de Métricas")

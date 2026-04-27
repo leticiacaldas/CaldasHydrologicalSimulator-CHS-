@@ -1,12 +1,12 @@
 """
-Motor de simulação de inundação com NumPy — versão D8 com escoamento direcional.
+Engine flood simulation com NumPy — versão D8 com flow directional.
 
-Esta versão prioriza escoamento direcional (D8/LDD) a partir do DEM, com
+This version prioritizes flow directional (D8/LDD) a partir do DEM, com
 fallback difusivo para permitir transbordamento/espalhamento quando o
-caminho preferencial não está disponível.
+preferred path not available.
 
 Melhorias sobre o modelo clássico de difusão-onda:
-- Fluxo direcional D8 (steepest descent) para rotear água de forma mais realista
+- Fluxo directional D8 (steepest descent) para rotear água de forma mais realista
 - Intensidade espacial de chuva (possibilidade de não-uniforme)
 - Fallback difusivo controlado para áreas de baixa declividade/planos
 
@@ -19,18 +19,18 @@ from typing import Optional, Set, Tuple, Dict, Any, List
 
 
 class GamaFloodModelNumpy:
-    """Motor de simulação de inundação com NumPy (versão D8 com escoamento direcional).
+    """Engine flood simulation com NumPy (versão D8 com flow directional).
 
-    Esta versão prioriza escoamento direcional (D8/LDD) a partir do DEM, com
+    This version prioritizes flow directional (D8/LDD) a partir do DEM, com
     fallback difusivo para permitir transbordamento/espalhamento quando o
-    caminho preferencial não está disponível.
+    preferred path not available.
 
     Parâmetros
     ----------
     dem_data : np.ndarray
         Matriz 2D com altitudes (m a.s.l.)
     sources_mask : np.ndarray
-        Máscara 2D (uint8/bool) com fontes de chuva
+        Máscara 2D (uint8/bool) com sources de chuva
     diffusion_rate : float
         Fração de água que pode se mover por passo (0 < rate ≤ 1)
     flood_threshold : float
@@ -40,9 +40,9 @@ class GamaFloodModelNumpy:
     river_mask : np.ndarray, optional
         Máscara opcional de rio (não obrigatório)
     sources_intensity : np.ndarray, optional
-        Mapa de intensidade espacial (float32) com valores relativos
+        Mapa de intensity espacial (float32) com valores relativos
     intensity_mode : str
-        "relative" (padrão) normaliza intensidade; "absolute" usa valores diretos
+        "relative" (padrão) normaliza intensity; "absolute" usa valores diretos
     """
 
     def __init__(
@@ -86,7 +86,7 @@ class GamaFloodModelNumpy:
             else np.zeros_like(self.altitude, dtype=bool)
         )
 
-        # Mapa de intensidade espacial (float) — valores relativos
+        # Mapa de intensity espacial (float) — valores relativos
         # (qualquer escala). Normalizamos internamente quando aplicável.
         if sources_intensity is not None:
             try:
@@ -107,7 +107,7 @@ class GamaFloodModelNumpy:
         self.water_height = np.zeros_like(self.altitude, dtype=np.float32)
 
         # Direção de fluxo (D8) calculada a partir do DEM
-        # (com pequeno viés para rios, se houver).
+        # (com pequeno viés para rivers, se houver).
         dem_eff = self.altitude.copy()
         try:
             if np.any(self.river_mask):
@@ -292,7 +292,7 @@ class GamaFloodModelNumpy:
             self.active_cells_coords.update(zip(ys, xs))
             return
 
-        # Caso não seja uniforme: se houver mapa de intensidade espacial, usá-lo
+        # Caso não seja uniforme: se houver mapa de intensity espacial, usá-lo
         # preferencialmente
         if self.sources_intensity is not None and np.any(
             self.sources_intensity > 0
@@ -321,7 +321,7 @@ class GamaFloodModelNumpy:
             except Exception:
                 pass
 
-        # Se não houver mapa de intensidade, usar máscara de fontes/rios/fallback
+        # Se não houver mapa de intensity, usar máscara de sources/rivers/fallback
         if np.any(self.is_source):
             self.water_height[self.is_source] += water_to_add_meters
             ys, xs = np.where(self.is_source)
@@ -331,16 +331,16 @@ class GamaFloodModelNumpy:
             ys, xs = np.where(self.river_mask)
             self.active_cells_coords.update(zip(ys, xs))
         else:
-            # Fallback: sem fontes nem rio definidos, distribuir uniformemente
+            # Fallback: sem sources nem rio definidos, distribuir uniformemente
             self.water_height += water_to_add_meters
             ys, xs = np.where(self.water_height > 0)
             self.active_cells_coords.update(zip(ys, xs))
 
     def run_flow_step(self) -> None:
-        """Executa um passo de escoamento com fluxo D8 + fallback difusivo.
+        """Executa um passo de flow com fluxo D8 + fallback difusivo.
 
         Prioriza:
-        1. Escoamento direcional D8 (steepest descent)
+        1. Escoamento directional D8 (steepest descent)
         2. Fallback difusivo para transbordamento/planos
         """
         if not self.active_cells_coords:
@@ -357,7 +357,7 @@ class GamaFloodModelNumpy:
                 to_deactivate.add((y, x))
                 continue
 
-            # (1) Escoamento direcional (D8) preferencial
+            # (1) Escoamento directional (D8) preferencial
             dy = int(self._flow_dy[y, x])
             dx = int(self._flow_dx[y, x])
             move_amount = float(cur_w) * float(self.diffusion_rate)
@@ -389,7 +389,7 @@ class GamaFloodModelNumpy:
             # (2) Fallback difusivo quando não há rota válida
             # (transbordamento/planos)
             if not routed:
-                # Mantém preferência direcional; espalha só parte
+                # Keeps preferência directional; espalha só parte
                 overflow_amount = move_amount * 0.35
                 self._diffuse_overflow_step(
                     prev, y, x, overflow_amount, newly_active, to_deactivate

@@ -1,9 +1,9 @@
 """
-example_design_showcase.py - Demonstração dos Componentes de Design
+example_design_showcase.py - Demonstration dos Componentes de Design
 
 Execute com: streamlit run example_design_showcase.py
 
-Este arquivo demonstra todos os componentes visuais disponíveis no design.py
+Este arquivo demonstra todos os components visuais disponíveis no design.py
 """
 
 import streamlit as st
@@ -20,9 +20,9 @@ from design import (
 
 
 def main():
-    """Página principal com demonstração dos componentes."""
+    """Main page com demonstração dos components."""
     
-    # Configurar página
+    # Configure page
     st.set_page_config(
         page_title="HydroSim-RF Design System",
         page_icon="💧",
@@ -203,7 +203,7 @@ def main():
     # Cabeçalho
     create_header(
         title="HydroSim-RF",
-        subtitle="Simulador Híbrido de Inundações"
+        subtitle="Hybrid Simulator de Floods"
     )
     
     # Simulação...
