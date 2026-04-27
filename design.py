@@ -662,14 +662,14 @@ def create_progress_timeline(steps: List[Dict[str, str]]):
 
 
 if __name__ == "__main__":
-    # Exemplo de uso
+    # Example de uso
     apply_modern_theme()
     create_header(
         title="HydroSim-RF",
         subtitle="Simulador Híbrido de Inundações Urbanas"
     )
     
-    st.write("## Exemplo de Cards de Métricas")
+    st.write("## Example de Cards de Métricas")
     metrics = [
         {'label': 'Área Inundada', 'value': '125.5', 'unit': 'km²', 'status': 'warning', 'icon': '💧'},
         {'label': 'Volume', 'value': '2.3M', 'unit': 'm³', 'status': 'danger', 'icon': '🌊'},

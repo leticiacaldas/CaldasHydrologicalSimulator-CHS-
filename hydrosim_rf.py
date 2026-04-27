@@ -1812,7 +1812,7 @@ def _render_simulation_outputs(model, _tmp_dir, anim_path, anim_format, total_ra
     try:
         buf_zip = io.BytesIO()
         with zipfile.ZipFile(buf_zip, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-            # Parâmetros/JSON
+            # Parameters/JSON
             params: Dict[str, Any] = {}
             try:
                 last = model.history[-1] if len(model.history) else {}
@@ -2208,7 +2208,7 @@ def main():
             st.session_state["puddle_quantile"] = float(puddle_quantile)
             st.session_state["puddle_strength"] = float(puddle_strength)
 
-            # Parâmetros adicionais
+            # Parameters adicionais
             col_adv1, col_adv2 = st.columns(2)
             with col_adv1:
                 grid_reduction_factor = st.select_slider(
