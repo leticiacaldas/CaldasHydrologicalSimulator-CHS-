@@ -1,160 +1,167 @@
 # CaldasHydrologicalSimulator (CHS): Hybrid Raster-Based Urban Flood Simulation Framework
 
-## Descrição
+## Overview
 
-**CaldasHydrologicalSimulator (CHS)** é uma aplicação web interativa para simulação rápida de inundações urbanas em 2D usando Modelos de Elevação Digital (DEMs). Implementa:
+**CaldasHydrologicalSimulator (CHS)** is an interactive web application for rapid 2D urban flood simulation using Digital Elevation Models (DEMs). It implements:
 
-- **Núcleo hidrodinâmico**: Aproximação de onda de difusão via solver NumPy vetorizado (`DiffusionWaveFloodModel`)
-- **Classificador de Machine Learning**: Random Forest para estimativa de probabilidade de inundação sem necessidade de dados de calibração
-- **Análise espacial**: Identificação automática de zonas elegíveis para mitigação de inundações (reflorestamento, diques, drenagem, aterro)
-- **Visualização interativa**: Streamlit com basemaps online, animações (GIF/MP4) e exportação de dados
+- **Hydrodynamic Core**: Diffusion wave approximation via vectorized NumPy solver (`DiffusionWaveFloodModel`)
+- **Machine Learning Classifier**: Random Forest for flood probability estimation without requiring calibration data
+- **Spatial Analysis**: Automatic identification of eligible zones for flood mitigation (reforestation, levees, drainage, land elevation)
+- **Interactive Visualization**: Streamlit with online basemaps, animations (GIF/MP4), and data export
 
-## Requisitos do Sistema
+## System Requirements
 
-### Local (com venv)
+### Local (with venv)
 
 - **Python**: 3.9+
-- **GDAL**: Sistema operacional (Linux/macOS/Windows)
-- **Memoria**: 4GB recomendado
-- **Processador**: Qualquer processador moderno
+- **GDAL**: Operating system (Linux/macOS/Windows)
+- **Memory**: 4GB recommended
+- **Processor**: Any modern processor
 
 ### Docker
 
 - **Docker**: 20.10+
 - **Docker Compose**: 1.29+
-- **Disco**: 2-3GB para a imagem
+- **Disk Space**: 2-3GB for the image
 
-## Instalação
+## Installation
 
-### Opção 1: Ambiente Virtual Local (venv)
+### Option 1: Local Virtual Environment (venv)
 
 ```bash
-cd /home/leticia/Desktop/hydrosim
+cd /path/to/CaldasHydrologicalSimulator
 
-# Ativar ambiente virtual
+# Activate virtual environment
 source venv/bin/activate  # Linux/macOS
-# ou
+# or
 venv\Scripts\activate  # Windows
 
-# Instalar dependências
+# Install dependencies
 pip install -r requirements.txt
 
-# Executar aplicação
+# Run application
 streamlit run hydrosim_rf.py
 ```
 
-A aplicação estará disponível em: **[http://localhost:8501](http://localhost:8501)**
+The application will be available at: **[http://localhost:8501](http://localhost:8501)**
 
-### Opção 2: Docker (Recomendado)
+### Option 2: Docker (Recommended)
 
 ```bash
-cd /home/leticia/Desktop/hydrosim
+cd /path/to/CaldasHydrologicalSimulator
 
-# Construir imagem
-docker build -t hydrosim-rf .
+# Build image
+docker build -t chs .
 
-# Executar com docker-compose
+# Run with docker-compose
 docker-compose up -d
 
-# Ou executar diretamente
-docker run -p 8501:8501 -v $(pwd)/data:/app/data hydrosim-rf
+# Or run directly
+docker run -p 8501:8501 -v $(pwd)/data:/app/data chs
 ```
 
-**A aplicação estará disponível em**: [http://localhost:8501](http://localhost:8501)
+**The application will be available at**: [http://localhost:8501](http://localhost:8501)
 
-## Estrutura do Projeto
+## Project Structure
 
 ```text
-hydrosim/
-├── hydrosim_rf.py              # Aplicação principal (Streamlit)
-├── shapes.py                   # Estilos CSS customizados
-├── requirements.txt            # Dependências Python
-├── Dockerfile                  # Configuração Docker
-├── docker-compose.yml          # Orquestração de contêiner
-├── .dockerignore               # Arquivos excluídos do Docker
-├── .gitignore                  # Arquivos excluídos do Git
-├── README.md                   # Este arquivo
-├── logos/                      # Assets (logo, ícones)
+CaldasHydrologicalSimulator/
+├── hydrosim_rf.py              # Main application (Streamlit UI)
+├── web_server_v3.py            # REST API server
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Docker configuration
+├── docker-compose.yml          # Container orchestration
+├── .dockerignore               # Docker exclusions
+├── .gitignore                  # Git exclusions
+├── README.md                   # This file
+├── configs/
+│   └── default.json            # Configuration file
 ├── data/
-│   ├── input/                  # DEMs e vetores de entrada
-│   └── output/                 # Resultados de simulações
-├── logs/                       # Arquivos de log
-└── venv/                       # Ambiente virtual Python
+│   ├── input/                  # Input DEMs and vectors
+│   └── output/                 # Simulation results
+├── src/
+│   ├── core/                   # Core hydrodynamic models
+│   ├── data/                   # Data loading modules
+│   ├── io/                     # I/O and export formats
+│   ├── ml/                     # Machine learning classifiers
+│   └── ui/                     # UI components
+├── logs/                       # Log files
+└── venv/                       # Python virtual environment
 ```
 
-## Dependências Principais
+## Key Dependencies
 
-| Pacote | Versão | Propósito |
+| Package | Version | Purpose |
 | --- | --- | --- |
-| `streamlit` | ≥1.28.0 | Framework web interativo |
-| `numpy` | ≥1.24.0 | Computação numérica (solver) |
-| `rasterio` | ≥1.3.0 | E/S de rasters geoespaciais |
-| `geopandas` | ≥0.13.0 | Processamento vetorial |
+| `streamlit` | ≥1.28.0 | Interactive web framework |
+| `numpy` | ≥1.24.0 | Numerical computation (solver) |
+| `rasterio` | ≥1.3.0 | Geospatial raster I/O |
+| `geopandas` | ≥0.13.0 | Vector data processing |
 | `scikit-learn` | ≥1.3.0 | Random Forest classifier |
-| `matplotlib` | ≥3.7.0 | Visualização e animações |
-| `imageio-ffmpeg` | ≥0.4.8 | Exportação de vídeos MP4 |
+| `matplotlib` | ≥3.7.0 | Visualization and animations |
+| `imageio-ffmpeg` | ≥0.4.8 | MP4 video export |
 
-## Como Usar
+## Usage Guide
 
-### 1. Preparar Dados de Entrada
+### 1. Prepare Input Data
 
-Você precisará de:
+You will need:
 
-- **DEM (GeoTIFF)**: Raster de elevação em coordenadas geográficas
-- **Vetor de Fontes (opcional)**: Polígonos (GeoPackage/.shp) definindo áreas de chuva
-- **Vetor de Rio (opcional)**: Polígonos/linhas definindo a rede de drenagem
-- **DOM/Ortoimage (opcional)**: Ortofoto para visualização
+- **DEM (GeoTIFF)**: Elevation raster in geographic coordinates
+- **Source Polygons (optional)**: Polygons (GeoPackage/.shp) defining rainfall areas
+- **River Network (optional)**: Polygons/lines defining the drainage network
+- **Orthophoto (optional)**: Aerial imagery for visualization
 
-### 2. Executar Simulação
+### 2. Run Simulation
 
-1. Abrir a aplicação: [http://localhost:8501](http://localhost:8501)
-2. **Aba "Simulation"**:
-   - Upload do DEM (obrigatório)
-   - Upload de polígonos de fonte (opcional)
-   - Configurar parâmetros de chuva, tempo de passo, coeficiente de difusão
-   - Clicar em **"Run Simulation"**
-3. A animação será gerada em tempo real
+1. Open the application: [http://localhost:8501](http://localhost:8501)
+2. **Simulation Tab**:
+   - Upload DEM (required)
+   - Upload source polygons (optional)
+   - Configure rainfall parameters, time step, diffusion coefficient
+   - Click **"Run Simulation"**
+3. Animation is generated in real-time
 
-### 3. Validação com Random Forest (IA)
+### 3. ML-Based Validation
 
-1. Após simulação, na seção **"Random Forest Inundation Probability"**:
-   - Treinar modelo com `n_estimators` e `max_depth` customizáveis
-   - O modelo aprende a relação entre topografia (elevação, declividade) e inundação
+1. After simulation, in the **"Random Forest Inundation Probability"** section:
+   - Train model with customizable `n_estimators` and `max_depth`
+   - Model learns topography-inundation relationships
 
-### 4. Análise de Mitigação
+### 4. Mitigation Analysis
 
-1. Na seção **"Spatial Flood Mitigation Analysis"**:
-   - Executar análise espacial automática
-   - Identificar zonas elegíveis para:
-     - **Reflorestamento / infraestrutura verde**
-     - **Diques/levees**
-     - **Sistemas de drenagem**
-     - **Aterro de terreno**
-2. Gerar relatório detalhado com sugestões
+1. In the **"Spatial Flood Mitigation Analysis"** section:
+   - Run automatic spatial analysis
+   - Identify eligible zones for:
+     - **Reforestation / green infrastructure**
+     - **Levees / flood barriers**
+     - **Drainage systems**
+     - **Land elevation / terracing**
+2. Generate detailed report with recommendations
 
-## Recursos Avançados
+## Advanced Features
 
-### Exportação de Dados
+### Data Export
 
-- **CSV**: Série temporal de diagnósticos (área inundada, volume, profundidade)
-- **GeoTIFF**: Rasters de probabilidade (IA) e inundação simulada
-- **PNG**: Sobreposições de mapa
-- **GIF/MP4**: Animações de inundação
-- **ZIP**: Pacote completo com todos os artefatos
+- **CSV**: Time series diagnostics (flooded area, volume, depth)
+- **GeoTIFF**: Probability rasters (ML) and simulated flood extent
+- **PNG**: Map overlays
+- **GIF/MP4**: Flood animations
+- **ZIP**: Complete package with all artifacts
 
-### Personalização Visual
+### Visual Customization
 
-- **Basemap**: Escolher entre Esri, CartoDB, OpenStreetMap ou nenhum
-- **Hillshade**: Sombreamento analítico do DEM
-- **Transparência e cores**: Controlar visualização da água
-- **Contornos**: Destacar limite de inundação
+- **Basemap**: Choose from Esri, CartoDB, OpenStreetMap, or none
+- **Hillshade**: Analytical relief shading of DEM
+- **Transparency & Colors**: Control water visualization
+- **Contours**: Highlight flood extent boundaries
 
-### Parâmetros Hidrodinâmicos
+### Hydrodynamic Parameters
 
-- **Coeficiente de difusão (α)**: 0.01–1.0 (determina propagação lateral)
-- **Limiar de inundação (h\*)**: Profundidade mínima para classificação
-- **Tamanho do passo de tempo**: 1–1440 minutos
-- **Fator de reamostragem**: 1×–16× (velocidade vs. precisão)
+- **Diffusion coefficient (α)**: 0.01–1.0 (determines lateral propagation)
+- **Flood threshold (h\*)**: Minimum depth for classification
+- **Time step size**: 1–1440 minutes
+- **Resampling factor**: 1×–16× (speed vs. accuracy)
 
 ## Troubleshooting
 
@@ -174,7 +181,7 @@ sudo apt-get install gdal-bin libgdal-dev libproj-dev libgeos-dev
 # macOS
 brew install gdal proj geos
 
-# Usar Docker se problemas persistirem
+# Use Docker if problems persist
 docker-compose up
 ```
 
@@ -184,60 +191,60 @@ docker-compose up
 pip install imageio-ffmpeg
 ```
 
-### Aplicação lenta (simulação de larga escala)
+### Slow application (large-scale simulation)
 
-- Aumentar **"Grid resampling factor"** para 4, 8 ou 16
-- Reduzir duração da animação ("Quick preview" para testes)
-- Executar no Docker com limite de memória: `docker-compose.yml`
+- Increase **"Grid resampling factor"** to 4, 8, or 16
+- Reduce animation duration ("Quick preview" for testing)
+- Run in Docker with memory limits: `docker-compose.yml`
 
-## Estrutura de Código
+## Code Structure
 
-### Classes Principais
+### Core Classes
 
 #### `DiffusionWaveFloodModel`
 
-Núcleo da simulação. Implementa propagação de água em 2D com:
+Simulation engine. Implements 2D water propagation with:
 
-- Redistribuição de água para células vizinhas de menor elevação
-- Conservação de volume de água
-- Registro de diagnósticos temporais
-- Suporte a máscaras de fonte e rio
+- Water redistribution to lower-elevation neighboring cells
+- Water volume conservation
+- Temporal diagnostics logging
+- Support for source and river masks
 
 #### `RandomForestClassifier` (scikit-learn)
 
-Treinado em:
+Trained on:
 
-- **Entradas**: Elevation normalizada, slope normalizada (derivados do DEM)
-- **Saída**: Probabilidade binária de inundação (0–1)
-- **Uso**: Transferência para novos DEMs sem simulação completa
+- **Inputs**: Normalized elevation, normalized slope (DEM derivatives)
+- **Output**: Binary flood probability (0–1)
+- **Usage**: Transfer to new DEMs without full simulation
 
-### Funções de Análise
+### Analysis Functions
 
-- `_prepare_spatial_domain()`: Lê DEM, reamostra, rasteriza vetores
-- `_identify_intervention_zones()`: Análise de mitigação (DBSCAN, morphological filters)
-- `_train_flood_classifier()`: Treino do RF com class balancing
-- `_predict_probability()`: Predição em novo DEM
-- `_build_mitigation_report()`: Relatório estruturado com citações científicas
+- `_prepare_spatial_domain()`: Read DEM, resample, rasterize vectors
+- `_identify_intervention_zones()`: Mitigation analysis (DBSCAN, morphological filters)
+- `_train_flood_classifier()`: RF training with class balancing
+- `_predict_probability()`: Prediction on new DEM
+- `_build_mitigation_report()`: Structured report with scientific citations
 
-## Referências Bibliográficas
+## Scientific References
 
-- **Hunter et al. (2005)**: Diffusion-wave formulation para modelagem de inundação
-- **Breiman (2001)**: Random Forests (teoria do classificador)
-- **Neal et al. (2012)**: Aproximação zero-inércia para hidrodinâmica
-- **Rogger et al. (2017)**: Impacto de mudança de uso do solo em inundações
-- **EU Directive 2007/60/EC**: Gestão de risco de inundação
+- **Hunter et al. (2005)**: Diffusion-wave formulation for flood modeling
+- **Breiman (2001)**: Random Forests (classifier theory)
+- **Neal et al. (2012)**: Zero-inertia approximation for hydrodynamics
+- **Rogger et al. (2017)**: Impact of land-use change on floods
+- **EU Directive 2007/60/EC**: Flood risk management
 
-## Licença
+## License
 
-MIT License — Ver arquivo LICENSE para detalhes
+MIT License — See LICENSE file for details
 
-## Suporte
+## Support
 
-Para problemas, abra uma issue no repositório GitHub ou entre em contato com a equipe de desenvolvimento.
+For issues, open an issue on the GitHub repository or contact the development team.
 
 ---
 
-**Versão**: 1.0.0  
-**Último update**: Março 2026  
-**Autor**: Letícia Caldas  
-**Instituição**: HydroLab Research Group
+**Version**: 1.0.0  
+**Last Updated**: April 2026  
+**Author**: Letícia Caldas  
+**Institution**: HydroLab Research Group
